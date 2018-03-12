@@ -1,0 +1,7 @@
+[package]
+name = "minreq"
+version = "0.1.0"
+authors = ["Jens Pitkanen <jens@neon.moe>"]
+
+[dependencies]
+curl = "0.4"
