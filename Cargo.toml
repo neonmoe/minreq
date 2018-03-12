@@ -4,7 +4,6 @@ version = "0.1.0"
 authors = ["Jens Pitkanen <jens@neon.moe>"]
 
 [dependencies]
-curl = "0.4"
 
 [dev-dependencies]
 tiny_http = "0.5"
