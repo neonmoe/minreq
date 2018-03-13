@@ -1,12 +1,24 @@
 use std::collections::HashMap;
+use std::fmt;
 
-/// An URL for requests.
+/// A URL type for requests.
 pub type URL = String;
 
 /// An HTTP request method.
 pub enum Method {
     Get,
     Post,
+}
+
+impl fmt::Display for Method {
+    /// Formats the Method to the form in the HTTP request,
+    /// ie. Method::Get -> "GET", Method::Post -> "POST", etc.
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            &Method::Get => write!(f, "GET"),
+            &Method::Post => write!(f, "POST"),
+        }
+    }
 }
 
 /// An HTTP request.
@@ -28,44 +40,72 @@ impl Request {
     ///
     /// This is only the request's data, it is not sent here. For
     /// sending the request, see [`get`](fn.get.html).
-    pub fn new<T: Into<URL>>(method: Method, url: T) -> Request {
+    pub fn new<T: Into<URL>>(method: Method, url: T, body: Option<URL>) -> Request {
         let (host, resource) = parse_url(url.into());
+        let mut headers = HashMap::new();
+        if let Some(ref body) = body {
+            headers.insert("Content-Length".to_string(), format!("{}", body.len()));
+        }
         Request {
             method,
             host,
             resource,
-            headers: HashMap::new(),
-            body: None,
+            headers,
+            body,
         }
     }
 
-    /// Adds a body to the Request and returns the new
-    /// version. Intended to be used like so:
-    ///
-    /// ```
-    /// use minreq::{Method, Request};
-    ///
-    /// let req = Request::new(Method::Post, "https://httpbin.org/post")
-    ///     .with_body("I'm the body of the request!");
-    /// ```
-    pub fn with_body<T: Into<String>>(mut self, body: T) -> Request {
-        self.body = Some(body.into());
-        self
+    /// Returns the HTTP request as a `String`, ready to be sent to
+    /// the server.
+    pub(crate) fn into_string(self) -> String {
+        let mut http = String::new();
+        // Add the request line and the "Host" header
+        http += &format!(
+            "{} {} HTTP/1.1\r\nHost: {}\r\n",
+            self.method, self.resource, self.host
+        );
+        // Add other headers
+        for (k, v) in self.headers {
+            http += &format!("{}: {}\r\n", k, v);
+        }
+        // Add the body
+        http += "\r\n";
+        if let Some(body) = self.body {
+            http += &format!("{}", body);
+        }
+        http
     }
 }
 
 /// An HTTP response.
 pub struct Response {
+    /// The headers of the response.
     pub headers: HashMap<String, String>,
+    /// The body of the response.
     pub body: String,
 }
 
 impl Response {
-    /// Creates a new HTTP `Response`.
-    ///
-    /// This is returned from the server after a
-    /// [`Request`](struct.Request.html) has been sent.
-    pub fn new(headers: HashMap<String, String>, body: String) -> Response {
+    pub(crate) fn from_string(response_text: String) -> Response {
+        let lines = response_text.lines();
+        let mut headers = HashMap::new();
+        let mut body = String::new();
+        let mut writing_headers = true;
+        for line in lines {
+            if line.is_empty() {
+                writing_headers = false;
+                continue;
+            }
+            if writing_headers {
+                if let Some(index) = line.find(":") {
+                    let key = line[..index].trim().to_string();
+                    let value = line[index..].trim().to_string();
+                    headers.insert(key, value);
+                }
+            } else {
+                body += &format!("{}\r\n", line);
+            }
+        }
         Response { headers, body }
     }
 }
@@ -77,10 +117,10 @@ fn parse_url(url: URL) -> (URL, URL) {
     for c in url.chars() {
         if c == '/' {
             slashes += 1;
-        }
-        if slashes < 3 {
+        } else if slashes == 2 {
             first.push(c);
-        } else {
+        }
+        if slashes == 3 {
             second.push(c);
         }
     }

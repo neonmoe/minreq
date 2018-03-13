@@ -4,22 +4,37 @@ use requests;
 use self::setup::*;
 
 #[test]
-fn test_get() {
+fn test_requests_get() {
     setup();
-    let response = requests::get(url("/boop")).body;
-    assert_eq!(response, "beep");
+    assert_eq!(
+        requests::get(url("/boop"), None).unwrap().body.trim(),
+        "beep"
+    );
 }
 
 #[test]
-fn test_post() {
+fn test_requests_post() {
     setup();
     assert_eq!(
-        requests::post(url("/insert"), "boop".to_string()).body,
+        requests::post(url("/clear"), None).unwrap().body.trim(),
         "ok"
     );
     assert_eq!(
-        requests::post(url("/insert"), "beep".to_string()).body,
+        requests::post(url("/insert"), Some("boop".to_string()))
+            .unwrap()
+            .body
+            .trim(),
         "ok"
     );
-    assert_eq!(requests::get(url("/list")).body, "[\"boop\", \"beep\"]");
+    assert_eq!(
+        requests::post(url("/insert"), Some("beep".to_string()))
+            .unwrap()
+            .body
+            .trim(),
+        "ok"
+    );
+    assert_eq!(
+        requests::get(url("/list"), None).unwrap().body.trim(),
+        "[\"boop\", \"beep\"]"
+    );
 }
