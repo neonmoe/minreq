@@ -28,8 +28,8 @@ impl Request {
     ///
     /// This is only the request's data, it is not sent here. For
     /// sending the request, see [`get`](fn.get.html).
-    pub fn new(method: Method, url: URL) -> Request {
-        let (host, resource) = parse_url(url);
+    pub fn new<T: Into<URL>>(method: Method, url: T) -> Request {
+        let (host, resource) = parse_url(url.into());
         Request {
             method,
             host,
@@ -39,8 +39,17 @@ impl Request {
         }
     }
 
-    pub fn with_body(mut self, body: String) -> Request {
-        self.body = Some(body);
+    /// Adds a body to the Request and returns the new
+    /// version. Intended to be used like so:
+    ///
+    /// ```
+    /// use minreq::{Method, Request};
+    ///
+    /// let req = Request::new(Method::Post, "https://httpbin.org/post")
+    ///     .with_body("I'm the body of the request!");
+    /// ```
+    pub fn with_body<T: Into<String>>(mut self, body: T) -> Request {
+        self.body = Some(body.into());
         self
     }
 }
