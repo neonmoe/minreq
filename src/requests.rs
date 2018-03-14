@@ -2,7 +2,7 @@ use std::io::Error;
 use http::{Method, Request, Response, URL};
 use connection::Connection;
 
-/// Sends a request to `url` with the `method`, returns the response or
+/// Sends a request to `url` with `method`, returns the response or
 /// an [`Error`](https://doc.rust-lang.org/std/io/struct.Error.html).
 ///
 /// In most cases it is recommended to use one of the aliases of this
@@ -12,10 +12,11 @@ use connection::Connection;
 /// [`options`](fn.options.html), [`connect`](fn.connect.html),
 /// [`patch`](fn.patch.html). They omit the `method` parameter, since
 /// it is implied in the name, and the body is as optional as it is
-/// defined in [RFC
-/// 7231](https://tools.ietf.org/html/rfc7231#section-4.3).
+/// on [Wikipedia](https://en.wikipedia.org/wiki/Hypertext_Transfer_Protocol#Summary_table).
 ///
 /// # Examples
+///
+/// ### Using `minreq::send`
 ///
 /// ```no_run
 /// use minreq::Method;
@@ -26,61 +27,62 @@ use connection::Connection;
 ///     Err(err) => println!("[ERROR]: {}", err),
 /// }
 /// ```
-pub fn send<T: Into<URL>>(
-    method: Method,
-    url: T,
-    body_generic: Option<T>,
-) -> Result<Response, Error> {
-    let mut body = None;
-    if let Some(body_unwrapped) = body_generic {
-        body = Some(body_unwrapped.into());
-    }
+///
+/// ### Using the aliases ie. how you'll actually probably use this crate
+///
+/// ```no_run
+/// // This is the same as above, except less elaborate, and more panic-y.
+/// if let Ok(response) = minreq::get("https://httpbin.org/ip", None) {
+///     println!("Your public IP: {}", response.body);
+/// }
+/// ```
+pub fn send<T: Into<URL>>(method: Method, url: T, body: Option<String>) -> Result<Response, Error> {
     let request = Request::new(method, url.into(), body);
     let connection = Connection::new(request);
     connection.send()
 }
 
-/// Sends a GET request to `url`, returns the response or
-/// an [`Error`](https://doc.rust-lang.org/std/io/struct.Error.html).
-///
-/// # Examples
-///
-/// ```no_run
-/// // This application prints out your public IP. (Or an error.)
-/// match minreq::get("https://httpbin.org/ip", None) {
-///     Ok(response) => println!("Your public IP: {}", response.body),
-///     Err(err) => println!("[ERROR]: {}", err),
-/// }
-/// ```
-pub fn get<T: Into<URL>>(url: T, body_generic: Option<T>) -> Result<Response, Error> {
-    let mut body = None;
-    if let Some(body_unwrapped) = body_generic {
-        body = Some(body_unwrapped.into());
-    }
-    let request = Request::new(Method::Get, url.into(), body);
-    let connection = Connection::new(request);
-    connection.send()
+/// Alias for [send](fn.send.html) with `method` set to [Method::Get](enum.Method.html).
+pub fn get<T: Into<URL>>(url: T, body: Option<String>) -> Result<Response, Error> {
+    send(Method::Get, url, body)
 }
 
-/// Sends a POST request to `url` with `body`, returns the response or
-/// an [`Error`](https://doc.rust-lang.org/std/io/struct.Error.html).
-///
-/// # Examples
-///
-/// ```no_run
-/// // This posts "hello" to a server, and prints out the response.
-/// // (Or an error.)
-/// match minreq::post("https://httpbin.org/post", Some("hello")) {
-///     Ok(response) => println!("{}", response.body),
-///     Err(err) => println!("[ERROR]: {}", err),
-/// }
-/// ```
-pub fn post<T: Into<URL>>(url: T, body_generic: Option<T>) -> Result<Response, Error> {
-    let mut body = None;
-    if let Some(body_unwrapped) = body_generic {
-        body = Some(body_unwrapped.into());
-    }
-    let request = Request::new(Method::Post, url.into(), body);
-    let connection = Connection::new(request);
-    connection.send()
+/// Alias for [send](fn.send.html) with `method` set to [Method::Head](enum.Method.html).
+pub fn head<T: Into<URL>>(url: T) -> Result<Response, Error> {
+    send(Method::Head, url, None)
+}
+
+/// Alias for [send](fn.send.html) with `method` set to [Method::Post](enum.Method.html).
+pub fn post<T: Into<URL>>(url: T, body: String) -> Result<Response, Error> {
+    send(Method::Post, url, Some(body))
+}
+
+/// Alias for [send](fn.send.html) with `method` set to [Method::Put](enum.Method.html).
+pub fn put<T: Into<URL>>(url: T, body: String) -> Result<Response, Error> {
+    send(Method::Put, url, Some(body))
+}
+
+/// Alias for [send](fn.send.html) with `method` set to [Method::Delete](enum.Method.html).
+pub fn delete<T: Into<URL>>(url: T) -> Result<Response, Error> {
+    send(Method::Delete, url, None)
+}
+
+/// Alias for [send](fn.send.html) with `method` set to [Method::Connect](enum.Method.html).
+pub fn connect<T: Into<URL>>(url: T, body: String) -> Result<Response, Error> {
+    send(Method::Connect, url, Some(body))
+}
+
+/// Alias for [send](fn.send.html) with `method` set to [Method::Options](enum.Method.html).
+pub fn options<T: Into<URL>>(url: T, body: Option<String>) -> Result<Response, Error> {
+    send(Method::Options, url, body)
+}
+
+/// Alias for [send](fn.send.html) with `method` set to [Method::Trace](enum.Method.html).
+pub fn trace<T: Into<URL>>(url: T) -> Result<Response, Error> {
+    send(Method::Trace, url, None)
+}
+
+/// Alias for [send](fn.send.html) with `method` set to [Method::Patch](enum.Method.html).
+pub fn patch<T: Into<URL>>(url: T, body: String) -> Result<Response, Error> {
+    send(Method::Patch, url, Some(body))
 }

@@ -22,24 +22,28 @@ pub fn setup() {
                 let mut content = String::new();
                 request.as_reader().read_to_string(&mut content).ok();
 
-                if *request.method() == Method::Get && &*request.url() == "/boop" {
-                    request.respond(Response::from_string("beep")).ok();
-                } else if *request.method() == Method::Get && &*request.url() == "/list" {
-                    request
-                        .respond(Response::from_string(format!("{:?}", list)))
-                        .ok();
-                } else if *request.method() == Method::Post && &*request.url() == "/clear" {
-                    list.clear();
-                    request.respond(Response::from_string("ok")).ok();
-                } else if *request.method() == Method::Post && &*request.url() == "/insert" {
-                    list.push(content);
-                    request
-                        .respond(Response::from_string("ok").with_status_code(201))
-                        .ok();
-                } else {
-                    request
-                        .respond(Response::from_string("Not Found").with_status_code(404))
-                        .ok();
+                let url = String::from(request.url());
+                match request.method() {
+                    &Method::Get if url == "/list" => {
+                        request
+                            .respond(Response::from_string(format!("{:?}", list)))
+                            .ok();
+                    }
+                    &Method::Delete if url == "/list" => {
+                        list.clear();
+                        request.respond(Response::from_string("ok")).ok();
+                    }
+                    &Method::Put if url == "/insert" => {
+                        list.push(content);
+                        request
+                            .respond(Response::from_string("ok").with_status_code(201))
+                            .ok();
+                    }
+                    _ => {
+                        request
+                            .respond(Response::from_string("Not Found").with_status_code(404))
+                            .ok();
+                    }
                 }
             }
         });

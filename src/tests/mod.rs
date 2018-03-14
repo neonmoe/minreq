@@ -4,30 +4,18 @@ use requests;
 use self::setup::*;
 
 #[test]
-fn test_requests_get() {
+fn test_requests() {
     setup();
+    assert_eq!(requests::delete(url("/list")).unwrap().body.trim(), "ok");
     assert_eq!(
-        requests::get(url("/boop"), None).unwrap().body.trim(),
-        "beep"
-    );
-}
-
-#[test]
-fn test_requests_post() {
-    setup();
-    assert_eq!(
-        requests::post(url("/clear"), None).unwrap().body.trim(),
-        "ok"
-    );
-    assert_eq!(
-        requests::post(url("/insert"), Some("boop".to_string()))
+        requests::put(url("/insert"), "boop".to_string())
             .unwrap()
             .body
             .trim(),
         "ok"
     );
     assert_eq!(
-        requests::post(url("/insert"), Some("beep".to_string()))
+        requests::put(url("/insert"), "beep".to_string())
             .unwrap()
             .body
             .trim(),
@@ -37,4 +25,6 @@ fn test_requests_post() {
         requests::get(url("/list"), None).unwrap().body.trim(),
         "[\"boop\", \"beep\"]"
     );
+    assert_eq!(requests::delete(url("/list")).unwrap().body.trim(), "ok");
+    assert_eq!(requests::get(url("/list"), None).unwrap().body.trim(), "[]");
 }
