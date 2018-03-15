@@ -94,7 +94,9 @@ impl Request {
 
 /// An HTTP response.
 pub struct Response {
+    /// The status code of the response, eg. 404.
     pub status_code: i32,
+    /// The reason phrase of the response, eg. "Not Found".
     pub reason_phrase: String,
     /// The headers of the response.
     pub headers: HashMap<String, String>,
@@ -139,25 +141,11 @@ fn parse_status_line(line: &str) -> (i32, String) {
     if let Some(code) = split.nth(1) {
         if let Ok(code) = code.parse::<i32>() {
             if let Some(reason) = split.next() {
-                (code, reason.to_string())
-            } else {
-                (
-                    503,
-                    "Server did not provide a valid status code".to_string(),
-                )
+                return (code, reason.to_string());
             }
-        } else {
-            (
-                503,
-                "Server did not provide a valid status code".to_string(),
-            )
         }
-    } else {
-        (
-            503,
-            "Server did not provide a valid status code".to_string(),
-        )
     }
+    (503, "Server did not provide a status line".to_string())
 }
 
 fn parse_http_response_content(lines: Lines) -> (HashMap<String, String>, String) {

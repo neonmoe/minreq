@@ -9,3 +9,4 @@ mod tests;
 
 pub use requests::*;
 pub use http::*;
+pub use connection::*;
