@@ -1,6 +1,6 @@
 [package]
 name = "minreq"
-version = "1.0.0"
+version = "1.0.1"
 authors = ["Jens Pitkanen <jens@neon.moe>"]
 description = "Simple, minimal-dependency HTTP client"
 documentation = "https://docs.rs/minreq"
@@ -12,7 +12,7 @@ categories = ["web-programming::http-client"]
 license = "ISC"
 
 [badges]
-travis-ci = { repository = "neonmoe/minreq", branch = "1.0.0" }
+travis-ci = { repository = "neonmoe/minreq", branch = "1.0.1" }
 codecov = { repository = "neonmoe/minreq" }
 maintenance = { status = "actively-developed" }
 
