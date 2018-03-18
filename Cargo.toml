@@ -2,7 +2,19 @@
 name = "minreq"
 version = "0.1.0"
 authors = ["Jens Pitkanen <jens@neon.moe>"]
+description = "Simple, minimal-dependency HTTP client"
+documentation = "https://docs.rs/minreq"
+homepage = "https://github.com/neonmoe/minreq"
+repository = "https://github.com/neonmoe/minreq"
+readme = "README.md"
+keywords = ["http", "client", "request"]
+categories = ["web-programming::http-client"]
 license = "ISC"
+
+[badges]
+travis-ci = { repository = "neonmoe/minreq" }
+codecov = { repository = "neonmoe/minreq" }
+maintenance = { status = "actively-developed" }
 
 [dependencies]
 
