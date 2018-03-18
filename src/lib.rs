@@ -3,6 +3,18 @@
 //! The library has a very minimal API, so you'll probably know
 //! everything you need to after reading a few examples.
 //!
+//! # HTTPS
+//!
+//! Since the crate is supposed to be minimal in terms of
+//! dependencies, HTTPS is a feature on its own, as it requires the
+//! (very good) [`rustls`](https://crates.io/crates/rustls) crate. To
+//! be able to send HTTPS requests, you need to change your
+//! Cargo.toml's `[dependencies]` part to something like the
+//! following:
+//! ```toml
+//! minreq = { version = "1.0.0", features = ["https"] }
+//! ```
+//!
 //! # Examples
 //!
 //! ## Get
@@ -77,16 +89,14 @@
 
 #[cfg(feature = "https")]
 extern crate rustls;
-#[cfg(test)]
-extern crate tiny_http;
+#[cfg(feature = "https")]
+extern crate webpki;
 #[cfg(feature = "https")]
 extern crate webpki_roots;
 
 mod requests;
 mod http;
 mod connection;
-#[cfg(test)]
-mod tests;
 
 pub use requests::*;
 pub use http::*;

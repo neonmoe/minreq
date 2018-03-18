@@ -1,14 +1,15 @@
+extern crate minreq;
+extern crate tiny_http;
 use std::thread;
 use std::io::Error;
 use std::sync::{Once, ONCE_INIT};
 use std::time::Duration;
 use std::sync::Arc;
-use tiny_http::{Method, Response, Server};
-use http;
+use self::tiny_http::{Method, Response, Server};
 
 static INIT: Once = ONCE_INIT;
 
-pub(crate) fn setup() {
+pub fn setup() {
     INIT.call_once(|| {
         let server = Arc::new(Server::http("0.0.0.0:35562").unwrap());
         for _ in 0..4 {
@@ -84,11 +85,11 @@ pub(crate) fn setup() {
     });
 }
 
-pub(crate) fn url(req: &str) -> String {
+pub fn url(req: &str) -> String {
     format!("http://0.0.0.0:35562{}", req)
 }
 
-pub(crate) fn get_body(request: Result<http::Response, Error>) -> String {
+pub fn get_body(request: Result<minreq::Response, Error>) -> String {
     match request {
         Ok(response) => String::from(response.body.trim()),
         Err(err) => {
@@ -98,7 +99,7 @@ pub(crate) fn get_body(request: Result<http::Response, Error>) -> String {
     }
 }
 
-pub(crate) fn get_status_code(request: Result<http::Response, Error>) -> i32 {
+pub fn get_status_code(request: Result<minreq::Response, Error>) -> i32 {
     match request {
         Ok(response) => response.status_code,
         Err(err) => {
