@@ -4,15 +4,6 @@ use requests;
 use self::setup::*;
 
 #[test]
-fn test_https() {
-    // TODO: Implement this locally.
-    assert_eq!(
-        get_status_code(requests::get("https://httpbin.org/status/418").send()),
-        418
-    );
-}
-
-#[test]
 fn test_latency() {
     setup();
     let body = get_body(
