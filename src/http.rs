@@ -175,7 +175,7 @@ fn parse_url(url: URL) -> (URL, URL, bool) {
     }
     let https = url.starts_with("https");
     if !first.contains(":") {
-        first += ":80";
+        first += if https { ":443" } else { ":80" };
     }
     (first, second, https)
 }
