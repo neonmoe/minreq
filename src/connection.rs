@@ -1,23 +1,29 @@
-use std::io::prelude::*;
-use std::io::{Error, ErrorKind};
+use std::io::{Error, ErrorKind, Read, Write};
 use std::net::TcpStream;
 use std::time::Duration;
 use std::env;
 use http::{Request, Response};
-use super::Connection;
+#[cfg(feature = "https")]
+use std::sync::Arc;
+#[cfg(feature = "https")]
+use rustls::{self, ClientConfig, ClientSession};
+#[cfg(feature = "https")]
+use webpki::DNSNameRef;
+#[cfg(feature = "https")]
+use webpki_roots::TLS_SERVER_ROOTS;
 
 /// A connection to the server for sending
 /// [`Request`](struct.Request.html)s.
-pub struct HTTPConnection {
+pub struct Connection {
     request: Request,
     timeout: u64,
 }
 
-impl HTTPConnection {
+impl Connection {
     /// Creates a new `Connection`. See
     /// [`Request`](struct.Request.html) for specifics about *what* is
     /// being sent.
-    pub(crate) fn new(request: Request) -> HTTPConnection {
+    pub(crate) fn new(request: Request) -> Connection {
         let timeout;
         if let Some(t) = request.timeout {
             timeout = t;
@@ -27,26 +33,44 @@ impl HTTPConnection {
                 .parse::<u64>()
                 .unwrap_or(5); // NaN -> 5
         }
-        HTTPConnection { request, timeout }
+        Connection { request, timeout }
     }
-}
 
-impl Connection for HTTPConnection {
     /// Sends the [`Request`](struct.Request.html), consumes this
     /// connection, and returns a [`Response`](struct.Response.html).
-    fn send(self) -> Result<Response, Error> {
+    #[cfg(feature = "https")]
+    pub(crate) fn send_https(self) -> Result<Response, Error> {
         let host = self.request.host.clone();
         let bytes = self.request.into_string().into_bytes();
 
-        let mut stream = TcpStream::connect(host)?;
-        // Set the timeouts if possible, but they aren't required..
-        stream
-            .set_read_timeout(Some(Duration::from_secs(self.timeout)))
-            .ok();
-        stream
-            .set_write_timeout(Some(Duration::from_secs(self.timeout)))
-            .ok();
+        // Rustls setup
+        let dns_name = host.clone();
+        let dns_name = dns_name.split(":").next().unwrap();
+        let dns_name = DNSNameRef::try_from_ascii_str(dns_name).unwrap();
+        let mut config = ClientConfig::new();
+        config
+            .root_store
+            .add_server_trust_anchors(&TLS_SERVER_ROOTS);
+        let mut sess = ClientSession::new(&Arc::new(config), dns_name);
 
+        // IO
+        let mut stream = create_tcp_stream(host, self.timeout)?;
+        let mut tls = rustls::Stream::new(&mut sess, &mut stream);
+        tls.write(&bytes)?;
+        match read_from_stream(tls) {
+            Ok(result) => Ok(Response::from_string(result)),
+            Err(err) => Err(err),
+        }
+    }
+
+    /// Sends the [`Request`](struct.Request.html), consumes this
+    /// connection, and returns a [`Response`](struct.Response.html).
+    pub(crate) fn send(self) -> Result<Response, Error> {
+        let host = self.request.host.clone();
+        let bytes = self.request.into_string().into_bytes();
+
+        // IO
+        let mut stream = create_tcp_stream(host, self.timeout)?;
         stream.write_all(&bytes)?;
         match read_from_stream(&stream) {
             Ok(response) => Ok(Response::from_string(response)),
@@ -61,9 +85,17 @@ impl Connection for HTTPConnection {
     }
 }
 
+fn create_tcp_stream(host: String, timeout: u64) -> Result<TcpStream, Error> {
+    let stream = TcpStream::connect(host)?;
+    let timeout = Some(Duration::from_secs(timeout));
+    stream.set_read_timeout(timeout).ok();
+    stream.set_write_timeout(timeout).ok();
+    Ok(stream)
+}
+
 /// Reads the stream until it can't or it reaches the end of the HTTP
 /// response.
-fn read_from_stream(stream: &TcpStream) -> Result<String, Error> {
+fn read_from_stream<T: Read>(stream: T) -> Result<String, Error> {
     let mut response = String::new();
     let mut response_length = None;
     let mut byte_count = 0;

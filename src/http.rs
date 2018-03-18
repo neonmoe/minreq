@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::fmt;
 use std::str::Lines;
 use std::io::Error;
-use connection::{Connection, HTTPConnection, HTTPSConnection};
+use connection::Connection;
 
 /// A URL type for requests.
 pub type URL = String;
@@ -102,11 +102,22 @@ impl Request {
     }
 
     /// Sends this request to the host.
+    #[cfg(feature = "https")]
     pub fn send(self) -> Result<Response, Error> {
         if self.https {
-            HTTPSConnection::new(self).send()
+            Connection::new(self).send_https()
         } else {
-            HTTPConnection::new(self).send()
+            Connection::new(self).send()
+        }
+    }
+
+    /// Sends this request to the host.
+    #[cfg(not(feature = "https"))]
+    pub fn send(self) -> Result<Response, Error> {
+        if self.https {
+            panic!("Can't send requests to urls that start with https:// when the `https` feature is not enabled!")
+        } else {
+            Connection::new(self).send()
         }
     }
 
@@ -173,7 +184,7 @@ fn parse_url(url: URL) -> (URL, URL, bool) {
             second.push(c);
         }
     }
-    let https = url.starts_with("https");
+    let https = url.starts_with("https://");
     if !first.contains(":") {
         first += if https { ":443" } else { ":80" };
     }

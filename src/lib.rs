@@ -78,6 +78,8 @@
 #[cfg(feature = "https")]
 extern crate rustls;
 #[cfg(feature = "https")]
+extern crate webpki;
+#[cfg(feature = "https")]
 extern crate webpki_roots;
 
 mod requests;

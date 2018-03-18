@@ -4,6 +4,7 @@ mod setup;
 use self::setup::*;
 
 #[test]
+#[cfg(feature = "https")]
 fn test_https() {
     // TODO: Implement this locally.
     assert_eq!(

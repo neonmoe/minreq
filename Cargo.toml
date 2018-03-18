@@ -19,6 +19,7 @@ maintenance = { status = "actively-developed" }
 [dependencies]
 rustls = { version = "0.12", optional = true }
 webpki-roots = { version = "0.14", optional = true }
+webpki = { version = "0.18.0-alpha", optional = true }
 
 [dev-dependencies]
 tiny_http = "0.5"
@@ -26,4 +27,4 @@ tiny_http = "0.5"
 [features]
 default = []
 
-https = ["rustls", "webpki-roots"]
+https = ["rustls", "webpki-roots", "webpki"]
