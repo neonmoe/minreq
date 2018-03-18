@@ -13,7 +13,7 @@ license = "ISC"
 
 [badges]
 travis-ci = { repository = "neonmoe/minreq", branch = "0.1.2" }
-codecov = { repository = "neonmoe/minreq", branch = "0.1.2" }
+codecov = { repository = "neonmoe/minreq" }
 maintenance = { status = "actively-developed" }
 
 [dependencies]
