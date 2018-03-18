@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::fmt;
 use std::str::Lines;
 use std::io::Error;
-use connection::{Connection, HTTPConnection};
+use connection::{Connection, HTTPConnection, HTTPSConnection};
 
 /// A URL type for requests.
 pub type URL = String;
@@ -104,7 +104,7 @@ impl Request {
     /// Sends this request to the host.
     pub fn send(self) -> Result<Response, Error> {
         if self.https {
-            unimplemented!();
+            HTTPSConnection::new(self).send()
         } else {
             HTTPConnection::new(self).send()
         }
