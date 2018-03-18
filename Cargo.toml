@@ -2,6 +2,7 @@
 name = "minreq"
 version = "0.1.0"
 authors = ["Jens Pitkanen <jens@neon.moe>"]
+license = "ISC"
 
 [dependencies]
 

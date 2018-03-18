@@ -17,25 +17,16 @@ impl Connection {
     /// [`Request`](struct.Request.html) for specifics about *what* is
     /// being sent.
     pub(crate) fn new(request: Request) -> Connection {
-        let timeout = env::var("MINREQ_TIMEOUT")
-            .unwrap_or("5".to_string())
-            .parse::<u64>()
-            .unwrap_or(5);
+        let timeout;
+        if let Some(t) = request.timeout {
+            timeout = t;
+        } else {
+            timeout = env::var("MINREQ_TIMEOUT")
+                .unwrap_or("5".to_string()) // Not defined -> 5
+                .parse::<u64>()
+                .unwrap_or(5); // NaN -> 5
+        }
         Connection { request, timeout }
-    }
-
-    /// Sets how long it takes to timeout (in seconds) for this
-    /// connection. Usage:
-    /// ```no_run
-    /// use minreq::Method;
-    ///
-    /// minreq::create_connection(Method::Get, "https://httpbin.org/ip", None)
-    ///     .with_timeout(10)
-    ///     .send();
-    /// ```
-    pub fn with_timeout(mut self, timeout: u64) -> Connection {
-        self.timeout = timeout;
-        self
     }
 
     /// Sends the [`Request`](struct.Request.html), consumes this

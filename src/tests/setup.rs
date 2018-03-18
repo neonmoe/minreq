@@ -18,9 +18,20 @@ pub(crate) fn setup() {
                 let mut request = server.recv().unwrap();
                 let mut content = String::new();
                 request.as_reader().read_to_string(&mut content).ok();
+                let headers = Vec::from(request.headers());
 
                 let url = String::from(request.url());
                 match request.method() {
+                    &Method::Get if url == "/header_pong" => {
+                        for header in headers {
+                            if header.field.as_str() == "Ping" {
+                                let response = Response::from_string(format!("{}", header.value));
+                                request.respond(response).ok();
+                                return;
+                            }
+                        }
+                        request.respond(Response::from_string("No header!")).ok();
+                    }
                     &Method::Get if url == "/slow_a" => {
                         thread::sleep(Duration::from_secs(2));
                         let response = Response::from_string(format!("j: {}", content));

@@ -1,21 +1,35 @@
 use std::collections::HashMap;
 use std::fmt;
 use std::str::Lines;
+use std::io::Error;
+use connection::Connection;
 
 /// A URL type for requests.
 pub type URL = String;
 
 /// An HTTP request method.
 pub enum Method {
+    /// The GET method
     Get,
+    /// The HEAD method
     Head,
+    /// The POST method
     Post,
+    /// The PUT method
     Put,
+    /// The DELETE method
     Delete,
+    /// The CONNECT method
     Connect,
+    /// The OPTIONS method
     Options,
+    /// The TRACE method
     Trace,
+    /// The PATCH method
     Patch,
+    /// A custom method, use with care: the string will be embedded in
+    /// your request as-is.
+    Custom(String),
 }
 
 impl fmt::Display for Method {
@@ -32,42 +46,63 @@ impl fmt::Display for Method {
             &Method::Options => write!(f, "OPTIONS"),
             &Method::Trace => write!(f, "TRACE"),
             &Method::Patch => write!(f, "PATCH"),
+            &Method::Custom(ref s) => write!(f, "{}", s),
         }
     }
 }
 
 /// An HTTP request.
 pub struct Request {
-    /// The HTTP request method.
-    pub method: Method,
-    /// The HTTP request's "Host" field.
-    pub host: URL,
-    /// The requested resource.
-    pub resource: URL,
-    /// The additional headers.
-    pub headers: HashMap<String, String>,
-    /// The optional body of the request.
-    pub body: Option<String>,
+    method: Method,
+    pub(crate) host: URL,
+    resource: URL,
+    headers: HashMap<String, String>,
+    body: Option<String>,
+    pub(crate) timeout: Option<u64>,
 }
 
 impl Request {
     /// Creates a new HTTP `Request`.
     ///
-    /// This is only the request's data, it is not sent here. For
-    /// sending the request, see [`get`](fn.get.html).
-    pub fn new<T: Into<URL>>(method: Method, url: T, body: Option<String>) -> Request {
+    /// This is only the request's data, it is not sent yet. For
+    /// sending the request, see [`send`](struct.Request.html#method.send).
+    pub fn new<T: Into<URL>>(method: Method, url: T) -> Request {
         let (host, resource) = parse_url(url.into());
-        let mut headers = HashMap::new();
-        if let Some(ref body) = body {
-            headers.insert("Content-Length".to_string(), format!("{}", body.len()));
-        }
         Request {
             method,
             host,
             resource,
-            headers,
-            body,
+            headers: HashMap::new(),
+            body: None,
+            timeout: None,
         }
+    }
+
+    /// Adds a header to the request this is called on. Use this
+    /// function to add headers to your requests.
+    pub fn with_header<T: Into<String>, U: Into<String>>(mut self, key: T, value: U) -> Request {
+        self.headers.insert(key.into(), value.into());
+        self
+    }
+
+    /// Sets the request body.
+    pub fn with_body<T: Into<String>>(mut self, body: T) -> Request {
+        let body = body.into();
+        let body_length = body.len();
+        self.body = Some(body);
+        self.with_header("Content-Length", format!("{}", body_length))
+    }
+
+    /// Sets the request timeout.
+    pub fn with_timeout(mut self, timeout: u64) -> Request {
+        self.timeout = Some(timeout);
+        self
+    }
+
+    /// Sends this request to the host.
+    pub fn send(self) -> Result<Response, Error> {
+        let connection = Connection::new(self);
+        connection.send()
     }
 
     /// Returns the HTTP request as a `String`, ready to be sent to
@@ -129,9 +164,12 @@ fn parse_url(url: URL) -> (URL, URL) {
         } else if slashes == 2 {
             first.push(c);
         }
-        if slashes == 3 {
+        if slashes >= 3 {
             second.push(c);
         }
+    }
+    if !first.contains(":") {
+        first += ":80";
     }
     (first, second)
 }
