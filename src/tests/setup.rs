@@ -42,7 +42,7 @@ pub(crate) fn setup() {
                         request.respond(response).ok();
                     }
                     &Method::Head if url == "/b" => {
-                        request.respond(Response::empty(420)).ok();
+                        request.respond(Response::empty(418)).ok();
                     }
                     &Method::Post if url == "/c" => {
                         let response = Response::from_string(format!("l: {}", content));
