@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::fmt;
 use std::str::Lines;
 use std::io::Error;
-use connection::Connection;
+use connection::{Connection, HTTPConnection};
 
 /// A URL type for requests.
 pub type URL = String;
@@ -59,6 +59,7 @@ pub struct Request {
     headers: HashMap<String, String>,
     body: Option<String>,
     pub(crate) timeout: Option<u64>,
+    https: bool,
 }
 
 impl Request {
@@ -67,7 +68,7 @@ impl Request {
     /// This is only the request's data, it is not sent yet. For
     /// sending the request, see [`send`](struct.Request.html#method.send).
     pub fn new<T: Into<URL>>(method: Method, url: T) -> Request {
-        let (host, resource) = parse_url(url.into());
+        let (host, resource, https) = parse_url(url.into());
         Request {
             method,
             host,
@@ -75,6 +76,7 @@ impl Request {
             headers: HashMap::new(),
             body: None,
             timeout: None,
+            https,
         }
     }
 
@@ -101,8 +103,11 @@ impl Request {
 
     /// Sends this request to the host.
     pub fn send(self) -> Result<Response, Error> {
-        let connection = Connection::new(self);
-        connection.send()
+        if self.https {
+            unimplemented!();
+        } else {
+            HTTPConnection::new(self).send()
+        }
     }
 
     /// Returns the HTTP request as a `String`, ready to be sent to
@@ -154,7 +159,7 @@ impl Response {
     }
 }
 
-fn parse_url(url: URL) -> (URL, URL) {
+fn parse_url(url: URL) -> (URL, URL, bool) {
     let mut first = URL::new();
     let mut second = URL::new();
     let mut slashes = 0;
@@ -168,10 +173,11 @@ fn parse_url(url: URL) -> (URL, URL) {
             second.push(c);
         }
     }
+    let https = url.starts_with("https");
     if !first.contains(":") {
         first += ":80";
     }
-    (first, second)
+    (first, second, https)
 }
 
 fn parse_status_line(line: &str) -> (i32, String) {

@@ -4,19 +4,20 @@ use std::net::TcpStream;
 use std::time::Duration;
 use std::env;
 use http::{Request, Response};
+use super::Connection;
 
 /// A connection to the server for sending
 /// [`Request`](struct.Request.html)s.
-pub struct Connection {
+pub struct HTTPConnection {
     request: Request,
     timeout: u64,
 }
 
-impl Connection {
+impl HTTPConnection {
     /// Creates a new `Connection`. See
     /// [`Request`](struct.Request.html) for specifics about *what* is
     /// being sent.
-    pub(crate) fn new(request: Request) -> Connection {
+    pub(crate) fn new(request: Request) -> HTTPConnection {
         let timeout;
         if let Some(t) = request.timeout {
             timeout = t;
@@ -26,12 +27,14 @@ impl Connection {
                 .parse::<u64>()
                 .unwrap_or(5); // NaN -> 5
         }
-        Connection { request, timeout }
+        HTTPConnection { request, timeout }
     }
+}
 
+impl Connection for HTTPConnection {
     /// Sends the [`Request`](struct.Request.html), consumes this
     /// connection, and returns a [`Response`](struct.Response.html).
-    pub fn send(self) -> Result<Response, Error> {
+    fn send(self) -> Result<Response, Error> {
         let host = self.request.host.clone();
         let bytes = self.request.into_string().into_bytes();
 
@@ -69,11 +72,12 @@ fn read_from_stream(stream: &TcpStream) -> Result<String, Error> {
     for byte in stream.bytes() {
         let byte = byte?;
         let c = byte as char;
+        print!("{}", c);
         response.push(c);
         byte_count += 1;
         if c == '\n' {
             // End of line, try to get the response length
-            if blank_line {
+            if blank_line && response_length.is_none() {
                 response_length = Some(get_response_length(response.clone()));
             }
             blank_line = true;

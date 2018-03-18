@@ -75,8 +75,12 @@
 
 #![deny(missing_docs)]
 
+#[cfg(feature = "https")]
+extern crate rustls;
 #[cfg(test)]
 extern crate tiny_http;
+#[cfg(feature = "https")]
+extern crate webpki_roots;
 
 mod requests;
 mod http;
