@@ -4,6 +4,9 @@ rust:
   - stable
   - beta
   - nightly
+script:
+  - cargo test
+  - cargo test --features "https"
 addons:
   apt:
     packages:
