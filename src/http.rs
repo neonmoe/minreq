@@ -184,6 +184,11 @@ fn parse_url(url: URL) -> (URL, URL, bool) {
             second.push(c);
         }
     }
+    // Ensure the resource is *something*
+    if second.len() == 0 {
+        second += "/";
+    }
+    // Set appropriate port
     let https = url.starts_with("https://");
     if !first.contains(":") {
         first += if https { ":443" } else { ":80" };
