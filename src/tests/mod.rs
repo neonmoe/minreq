@@ -27,6 +27,18 @@ fn test_headers() {
 }
 
 #[test]
+fn test_custom_method() {
+    use http::Method;
+    setup();
+    let body = get_body(
+        requests::create_request(Method::Custom("GET".to_string()), url("/a"))
+            .with_body("Q")
+            .send(),
+    );
+    assert_eq!("j: Q", body);
+}
+
+#[test]
 fn test_get() {
     setup();
     let body = get_body(requests::get(url("/a")).with_body("Q").send());
