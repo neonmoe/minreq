@@ -104,7 +104,6 @@ fn read_from_stream<T: Read>(stream: T) -> Result<String, Error> {
     for byte in stream.bytes() {
         let byte = byte?;
         let c = byte as char;
-        print!("{}", c);
         response.push(c);
         byte_count += 1;
         if c == '\n' {
