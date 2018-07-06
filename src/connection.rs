@@ -1,4 +1,4 @@
-use std::io::{Error, ErrorKind, Read, Write};
+use std::io::{BufReader, BufWriter, Error, ErrorKind, Read, Write};
 use std::net::TcpStream;
 use std::time::Duration;
 use std::env;
@@ -69,15 +69,22 @@ impl Connection {
         let host = self.request.host.clone();
         let bytes = self.request.into_string().into_bytes();
 
-        // IO
-        let mut stream = create_tcp_stream(host, self.timeout)?;
+        let tcp = create_tcp_stream(host, self.timeout)?;
+
+        // Send request
+        let mut stream = BufWriter::new(tcp);
         stream.write_all(&bytes)?;
-        match read_from_stream(&stream) {
+
+        // Receive response
+        let tcp = stream.into_inner()?;
+        let mut stream = BufReader::new(tcp);
+        match read_from_stream(&mut stream) {
             Ok(response) => Ok(Response::from_string(response)),
             Err(err) => match err.kind() {
                 ErrorKind::WouldBlock | ErrorKind::TimedOut => Err(Error::new(
                     ErrorKind::TimedOut,
-                    format!("Request timed out! Timeout: {:?}", stream.read_timeout()),
+                    format!("Request timed out! Timeout: {:?}",
+                            stream.get_ref().read_timeout()),
                 )),
                 _ => Err(err),
             },
