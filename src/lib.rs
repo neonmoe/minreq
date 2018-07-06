@@ -53,7 +53,7 @@
 //! ```no_run
 //! // To avoid timing out, or limit the request's response time even more,
 //! // use .with_timeout(n) before .send(). The given value is in seconds.
-//! // NOTE: The default timeout is 5 seconds.
+//! // NOTE: There is no timeout by default.
 //! if let Ok(response) = minreq::post("http://httpbin.org/delay/6")
 //!     .with_timeout(10)
 //!     .send()
@@ -63,8 +63,7 @@
 //! ```
 //!
 //! # Timeouts
-//! The timeout of the created request is 5 seconds by default. You
-//! can change this in two ways:
+//! By default, a request has no timeout.  You can change this in two ways:
 //! - Use this function (`create_request`) and call
 //!   [`with_timeout`](struct.Request.html#method.with_timeout)
 //!   on it to set the timeout per-request like so:
