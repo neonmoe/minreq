@@ -16,7 +16,7 @@ use webpki_roots::TLS_SERVER_ROOTS;
 /// [`Request`](struct.Request.html)s.
 pub struct Connection {
     request: Request,
-    timeout: u64,
+    timeout: Option<u64>,
 }
 
 impl Connection {
@@ -24,15 +24,12 @@ impl Connection {
     /// [`Request`](struct.Request.html) for specifics about *what* is
     /// being sent.
     pub(crate) fn new(request: Request) -> Connection {
-        let timeout;
-        if let Some(t) = request.timeout {
-            timeout = t;
-        } else {
-            timeout = env::var("MINREQ_TIMEOUT")
-                .unwrap_or("5".to_string()) // Not defined -> 5
-                .parse::<u64>()
-                .unwrap_or(5); // NaN -> 5
-        }
+        let timeout = request.timeout.or_else(|| {
+            match env::var("MINREQ_TIMEOUT") {
+                Ok(t) => t.parse::<u64>().ok(),
+                Err(_) => None
+            }
+        });
         Connection { request, timeout }
     }
 
@@ -85,11 +82,13 @@ impl Connection {
     }
 }
 
-fn create_tcp_stream(host: String, timeout: u64) -> Result<TcpStream, Error> {
+fn create_tcp_stream(host: String, timeout: Option<u64>) -> Result<TcpStream, Error> {
     let stream = TcpStream::connect(host)?;
-    let timeout = Some(Duration::from_secs(timeout));
-    stream.set_read_timeout(timeout).ok();
-    stream.set_write_timeout(timeout).ok();
+    if let Some(secs) = timeout {
+        let dur = Some(Duration::from_secs(secs));
+        stream.set_read_timeout(dur)?;
+        stream.set_write_timeout(dur)?;
+    }
     Ok(stream)
 }
 
