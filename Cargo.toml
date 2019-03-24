@@ -17,12 +17,12 @@ codecov = { repository = "neonmoe/minreq" }
 maintenance = { status = "passively-maintained" }
 
 [dependencies]
-rustls = { version = "0.12", optional = true }
-webpki-roots = { version = "0.14", optional = true }
-webpki = { version = "0.18.0-alpha", optional = true }
+rustls = { version = "0.15", optional = true }
+webpki-roots = { version = "0.16", optional = true }
+webpki = { version = "0.19", optional = true }
 
 [dev-dependencies]
-tiny_http = "0.5"
+tiny_http = "0.6"
 
 [features]
 default = []
