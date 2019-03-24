@@ -2,7 +2,7 @@ use std::io::{BufReader, BufWriter, Error, ErrorKind, Read, Write};
 use std::net::TcpStream;
 use std::time::Duration;
 use std::env;
-use http::{Request, Response};
+use crate::{Request, Response};
 #[cfg(feature = "https")]
 use std::sync::Arc;
 #[cfg(feature = "https")]

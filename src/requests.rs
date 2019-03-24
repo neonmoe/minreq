@@ -1,4 +1,4 @@
-use http::{Method, Request, URL};
+use crate::{Method, Request, URL};
 
 /// Sends a request to `url` with `method`, returns the response or
 /// an [`Error`](https://doc.rust-lang.org/std/io/struct.Error.html).
