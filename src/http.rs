@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::fmt;
 use std::str::Lines;
 use std::io::Error;
-use connection::Connection;
+use crate::connection::Connection;
 
 /// A URL type for requests.
 pub type URL = String;
@@ -36,17 +36,17 @@ impl fmt::Display for Method {
     /// Formats the Method to the form in the HTTP request,
     /// ie. Method::Get -> "GET", Method::Post -> "POST", etc.
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            &Method::Get => write!(f, "GET"),
-            &Method::Head => write!(f, "HEAD"),
-            &Method::Post => write!(f, "POST"),
-            &Method::Put => write!(f, "PUT"),
-            &Method::Delete => write!(f, "DELETE"),
-            &Method::Connect => write!(f, "CONNECT"),
-            &Method::Options => write!(f, "OPTIONS"),
-            &Method::Trace => write!(f, "TRACE"),
-            &Method::Patch => write!(f, "PATCH"),
-            &Method::Custom(ref s) => write!(f, "{}", s),
+        match *self {
+            Method::Get => write!(f, "GET"),
+            Method::Head => write!(f, "HEAD"),
+            Method::Post => write!(f, "POST"),
+            Method::Put => write!(f, "PUT"),
+            Method::Delete => write!(f, "DELETE"),
+            Method::Connect => write!(f, "CONNECT"),
+            Method::Options => write!(f, "OPTIONS"),
+            Method::Trace => write!(f, "TRACE"),
+            Method::Patch => write!(f, "PATCH"),
+            Method::Custom(ref s) => write!(f, "{}", s),
         }
     }
 }
@@ -137,7 +137,7 @@ impl Request {
         // Add the body
         http += "\r\n";
         if let Some(body) = self.body {
-            http += &format!("{}", body);
+            http += &body;
         }
         http
     }
@@ -185,19 +185,19 @@ fn parse_url(url: URL) -> (URL, URL, bool) {
         }
     }
     // Ensure the resource is *something*
-    if second.len() == 0 {
+    if second.is_empty() {
         second += "/";
     }
     // Set appropriate port
     let https = url.starts_with("https://");
-    if !first.contains(":") {
+    if !first.contains(':') {
         first += if https { ":443" } else { ":80" };
     }
     (first, second, https)
 }
 
 fn parse_status_line(line: &str) -> (i32, String) {
-    let mut split = line.split(" ");
+    let mut split = line.split(' ');
     if let Some(code) = split.nth(1) {
         if let Ok(code) = code.parse::<i32>() {
             if let Some(reason) = split.next() {
@@ -218,7 +218,7 @@ fn parse_http_response_content(lines: Lines) -> (HashMap<String, String>, String
             continue;
         }
         if writing_headers {
-            if let Some(index) = line.find(":") {
+            if let Some(index) = line.find(':') {
                 let key = line[..index].trim().to_string();
                 let value = line[index..].trim().to_string();
                 headers.insert(key, value);

@@ -10,6 +10,7 @@ readme = "README.md"
 keywords = ["http", "https", "client", "request"]
 categories = ["web-programming::http-client"]
 license = "ISC"
+edition = "2018"
 
 [badges]
 travis-ci = { repository = "neonmoe/minreq", branch = "1.0.3" }
