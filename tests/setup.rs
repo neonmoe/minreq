@@ -1,11 +1,11 @@
 extern crate minreq;
 extern crate tiny_http;
-use std::thread;
-use std::io::Error;
-use std::sync::{Once, ONCE_INIT};
-use std::time::Duration;
-use std::sync::Arc;
 use self::tiny_http::{Method, Response, Server};
+use std::io::Error;
+use std::sync::Arc;
+use std::sync::{Once, ONCE_INIT};
+use std::thread;
+use std::time::Duration;
 
 static INIT: Once = ONCE_INIT;
 

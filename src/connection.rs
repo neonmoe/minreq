@@ -1,12 +1,12 @@
-use std::io::{BufReader, BufWriter, Error, ErrorKind, Read, Write};
-use std::net::TcpStream;
-use std::time::Duration;
-use std::env;
 use crate::{Request, Response};
 #[cfg(feature = "https")]
-use std::sync::Arc;
-#[cfg(feature = "https")]
 use rustls::{self, ClientConfig, ClientSession};
+use std::env;
+use std::io::{BufReader, BufWriter, Error, ErrorKind, Read, Write};
+use std::net::TcpStream;
+#[cfg(feature = "https")]
+use std::sync::Arc;
+use std::time::Duration;
 #[cfg(feature = "https")]
 use webpki::DNSNameRef;
 #[cfg(feature = "https")]
@@ -24,12 +24,12 @@ impl Connection {
     /// [`Request`](struct.Request.html) for specifics about *what* is
     /// being sent.
     pub(crate) fn new(request: Request) -> Connection {
-        let timeout = request.timeout.or_else(|| {
-            match env::var("MINREQ_TIMEOUT") {
+        let timeout = request
+            .timeout
+            .or_else(|| match env::var("MINREQ_TIMEOUT") {
                 Ok(t) => t.parse::<u64>().ok(),
-                Err(_) => None
-            }
-        });
+                Err(_) => None,
+            });
         Connection { request, timeout }
     }
 
@@ -80,8 +80,10 @@ impl Connection {
             Err(err) => match err.kind() {
                 ErrorKind::WouldBlock | ErrorKind::TimedOut => Err(Error::new(
                     ErrorKind::TimedOut,
-                    format!("Request timed out! Timeout: {:?}",
-                            stream.get_ref().read_timeout()),
+                    format!(
+                        "Request timed out! Timeout: {:?}",
+                        stream.get_ref().read_timeout()
+                    ),
                 )),
                 _ => Err(err),
             },

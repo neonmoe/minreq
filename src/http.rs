@@ -1,8 +1,8 @@
+use crate::connection::Connection;
 use std::collections::HashMap;
 use std::fmt;
-use std::str::Lines;
 use std::io::Error;
-use crate::connection::Connection;
+use std::str::Lines;
 
 /// A URL type for requests.
 pub type URL = String;

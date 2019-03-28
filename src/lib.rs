@@ -93,9 +93,9 @@ extern crate webpki;
 #[cfg(feature = "https")]
 extern crate webpki_roots;
 
-mod requests;
-mod http;
 mod connection;
+mod http;
+mod requests;
 
-pub use requests::*;
 pub use http::*;
+pub use requests::*;
