@@ -1,4 +1,4 @@
-use crate::{Request, Response};
+use crate::{http, Request, Response};
 #[cfg(feature = "https")]
 use rustls::{self, ClientConfig, ClientSession};
 use std::env;
@@ -38,6 +38,7 @@ impl Connection {
     #[cfg(feature = "https")]
     pub(crate) fn send_https(self) -> Result<Response, Error> {
         let host = self.request.host.clone();
+        let is_head = self.request.method == http::Method::Head;
         let bytes = self.request.into_string().into_bytes();
 
         // Rustls setup
@@ -54,7 +55,7 @@ impl Connection {
         let mut stream = create_tcp_stream(host, self.timeout)?;
         let mut tls = rustls::Stream::new(&mut sess, &mut stream);
         tls.write(&bytes)?;
-        match read_from_stream(tls) {
+        match read_from_stream(tls, is_head) {
             Ok(result) => Ok(Response::from_string(result)),
             Err(err) => Err(err),
         }
@@ -64,6 +65,7 @@ impl Connection {
     /// connection, and returns a [`Response`](struct.Response.html).
     pub(crate) fn send(self) -> Result<Response, Error> {
         let host = self.request.host.clone();
+        let is_head = self.request.method == http::Method::Head;
         let bytes = self.request.into_string().into_bytes();
 
         let tcp = create_tcp_stream(host, self.timeout)?;
@@ -75,7 +77,7 @@ impl Connection {
         // Receive response
         let tcp = stream.into_inner()?;
         let mut stream = BufReader::new(tcp);
-        match read_from_stream(&mut stream) {
+        match read_from_stream(&mut stream, is_head) {
             Ok(response) => Ok(Response::from_string(response)),
             Err(err) => match err.kind() {
                 ErrorKind::WouldBlock | ErrorKind::TimedOut => Err(Error::new(
@@ -103,11 +105,12 @@ fn create_tcp_stream(host: String, timeout: Option<u64>) -> Result<TcpStream, Er
 
 /// Reads the stream until it can't or it reaches the end of the HTTP
 /// response.
-fn read_from_stream<T: Read>(stream: T) -> Result<String, Error> {
+fn read_from_stream<T: Read>(stream: T, head: bool) -> Result<String, Error> {
     let mut response = String::new();
     let mut response_length = None;
     let mut byte_count = 0;
     let mut blank_line = false;
+    let mut status_code = None;
 
     for byte in stream.bytes() {
         let byte = byte?;
@@ -115,15 +118,26 @@ fn read_from_stream<T: Read>(stream: T) -> Result<String, Error> {
         response.push(c);
         byte_count += 1;
         if c == '\n' {
-            // End of line, try to get the response length
-            if blank_line && response_length.is_none() {
-                let len = get_response_length(&response);
-                response_length = Some(len);
-                if len > response.len() {
-                    // This should never not be true, but a malicious
-                    // server could cause a panic if the check wasn't
-                    // here, so there's the reasoning for this branch.
-                    response.reserve(len - response.len());
+            // Read the status line if this was the first line
+            if status_code.is_none() {
+                status_code = Some(http::parse_status_line(&response).0);
+            }
+            if blank_line {
+                if let Some(code) = status_code {
+                    if head || code / 100 == 1 || code == 204 || code == 304 {
+                        response_length = Some(response.len());
+                    }
+                }
+                if response_length.is_none() {
+                    // There should be a body, try to get the response length
+                    let len = get_response_length(&response);
+                    response_length = Some(len);
+                    if len > response.len() {
+                        // This should never not be true, but a malicious
+                        // server could cause a panic if the check wasn't
+                        // here, so there's the reasoning for this branch.
+                        response.reserve(len - response.len());
+                    }
                 }
             }
             blank_line = true;
@@ -133,7 +147,7 @@ fn read_from_stream<T: Read>(stream: T) -> Result<String, Error> {
         }
 
         if let Some(len) = response_length {
-            if byte_count == len {
+            if byte_count >= len {
                 // We have reached the end of the HTTP
                 // response, break the reading loop.
                 break;

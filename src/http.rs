@@ -8,6 +8,7 @@ use std::str::Lines;
 pub type URL = String;
 
 /// An HTTP request method.
+#[derive(Clone, PartialEq, Debug)]
 pub enum Method {
     /// The GET method
     Get,
@@ -53,7 +54,7 @@ impl fmt::Display for Method {
 
 /// An HTTP request.
 pub struct Request {
-    method: Method,
+    pub(crate) method: Method,
     pub(crate) host: URL,
     resource: URL,
     headers: HashMap<String, String>,
@@ -196,7 +197,7 @@ fn parse_url(url: URL) -> (URL, URL, bool) {
     (first, second, https)
 }
 
-fn parse_status_line(line: &str) -> (i32, String) {
+pub(crate) fn parse_status_line(line: &str) -> (i32, String) {
     let mut split = line.split(' ');
     if let Some(code) = split.nth(1) {
         if let Ok(code) = code.parse::<i32>() {
