@@ -117,7 +117,14 @@ fn read_from_stream<T: Read>(stream: T) -> Result<String, Error> {
         if c == '\n' {
             // End of line, try to get the response length
             if blank_line && response_length.is_none() {
-                response_length = Some(get_response_length(response.clone()));
+                let len = get_response_length(&response);
+                response_length = Some(len);
+                if len > response.len() {
+                    // This should never not be true, but a malicious
+                    // server could cause a panic if the check wasn't
+                    // here, so there's the reasoning for this branch.
+                    response.reserve(len - response.len());
+                }
             }
             blank_line = true;
         } else if c != '\r' {
@@ -139,7 +146,7 @@ fn read_from_stream<T: Read>(stream: T) -> Result<String, Error> {
 
 /// Tries to find out how long the whole response will eventually be,
 /// in bytes.
-fn get_response_length(response: String) -> usize {
+fn get_response_length(response: &str) -> usize {
     // The length of the headers
     let mut byte_count = 0;
     for line in response.lines() {
