@@ -219,9 +219,7 @@ fn parse_http_response_content(lines: Lines) -> (HashMap<String, String>, String
             continue;
         }
         if writing_headers {
-            if let Some(index) = line.find(':') {
-                let key = line[..index].trim().to_string();
-                let value = line[index..].trim().to_string();
+            if let Some((key, value)) = parse_header(line) {
                 headers.insert(key, value);
             }
         } else {
@@ -229,4 +227,14 @@ fn parse_http_response_content(lines: Lines) -> (HashMap<String, String>, String
         }
     }
     (headers, body)
+}
+
+pub(crate) fn parse_header(line: &str) -> Option<(String, String)> {
+    if let Some(index) = line.find(':') {
+        let key = line[..index].trim().to_string();
+        let value = line[(index + 1)..].trim().to_string();
+        Some((key, value))
+    } else {
+        None
+    }
 }

@@ -108,7 +108,10 @@ fn create_tcp_stream(host: String, timeout: Option<u64>) -> Result<TcpStream, Er
 fn read_from_stream<T: Read>(stream: T, head: bool) -> Result<String, Error> {
     let mut response = String::new();
     let mut response_length = None;
+    let mut chunked = false;
+    let mut expecting_chunk_length = false;
     let mut byte_count = 0;
+    let mut last_newline_index = 0;
     let mut blank_line = false;
     let mut status_code = None;
 
@@ -118,29 +121,46 @@ fn read_from_stream<T: Read>(stream: T, head: bool) -> Result<String, Error> {
         response.push(c);
         byte_count += 1;
         if c == '\n' {
-            // Read the status line if this was the first line
             if status_code.is_none() {
+                // First line
                 status_code = Some(http::parse_status_line(&response).0);
             }
+
             if blank_line {
+                // Two consecutive blank lines, body should start here
                 if let Some(code) = status_code {
                     if head || code / 100 == 1 || code == 204 || code == 304 {
                         response_length = Some(response.len());
                     }
                 }
                 if response_length.is_none() {
-                    // There should be a body, try to get the response length
                     let len = get_response_length(&response);
                     response_length = Some(len);
                     if len > response.len() {
-                        // This should never not be true, but a malicious
-                        // server could cause a panic if the check wasn't
-                        // here, so there's the reasoning for this branch.
                         response.reserve(len - response.len());
                     }
                 }
+            } else if expecting_chunk_length {
+                expecting_chunk_length = false;
+                if let Ok(n) = usize::from_str_radix(&response[last_newline_index..].trim(), 16) {
+                    // Cut out the chunk length from the reponse
+                    response.truncate(last_newline_index);
+                    byte_count = last_newline_index;
+                    // Update response length according to the new chunk length
+                    if n == 0 {
+                        break;
+                    } else {
+                        response_length = Some(byte_count + n + 2);
+                    }
+                }
+            } else if let Some((key, value)) = http::parse_header(&response[last_newline_index..]) {
+                if key.trim() == "Transfer-Encoding" && value.trim() == "chunked" {
+                    chunked = true;
+                }
             }
+
             blank_line = true;
+            last_newline_index = byte_count;
         } else if c != '\r' {
             // Normal character, reset blank_line
             blank_line = false;
@@ -148,9 +168,15 @@ fn read_from_stream<T: Read>(stream: T, head: bool) -> Result<String, Error> {
 
         if let Some(len) = response_length {
             if byte_count >= len {
-                // We have reached the end of the HTTP
-                // response, break the reading loop.
-                break;
+                if chunked {
+                    // Transfer-Encoding is chunked, next up should be
+                    // the next chunk's length.
+                    expecting_chunk_length = true;
+                } else {
+                    // We have reached the end of the HTTP response,
+                    // break the reading loop.
+                    break;
+                }
             }
         }
     }
