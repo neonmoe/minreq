@@ -124,7 +124,7 @@ impl Request {
 
     /// Returns the HTTP request as a `String`, ready to be sent to
     /// the server.
-    pub(crate) fn into_string(self) -> String {
+    pub(crate) fn to_string(&self) -> String {
         let mut http = String::new();
         // Add the request line and the "Host" header
         http += &format!(
@@ -132,13 +132,13 @@ impl Request {
             self.method, self.resource, self.host
         );
         // Add other headers
-        for (k, v) in self.headers {
+        for (k, v) in &self.headers {
             http += &format!("{}: {}\r\n", k, v);
         }
         // Add the body
         http += "\r\n";
-        if let Some(body) = self.body {
-            http += &body;
+        if let &Some(ref body) = &self.body {
+            http += body;
         }
         http
     }

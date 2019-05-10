@@ -3,7 +3,7 @@ use crate::{http, Request, Response};
 use rustls::{self, ClientConfig, ClientSession};
 use std::env;
 use std::io::{BufReader, BufWriter, Error, ErrorKind, Read, Write};
-use std::net::TcpStream;
+use std::net::{TcpStream, ToSocketAddrs};
 #[cfg(feature = "https")]
 use std::sync::Arc;
 use std::time::Duration;
@@ -37,12 +37,11 @@ impl Connection {
     /// connection, and returns a [`Response`](struct.Response.html).
     #[cfg(feature = "https")]
     pub(crate) fn send_https(self) -> Result<Response, Error> {
-        let host = self.request.host.clone();
         let is_head = self.request.method == http::Method::Head;
-        let bytes = self.request.into_string().into_bytes();
+        let bytes = self.request.to_string().into_bytes();
 
         // Rustls setup
-        let dns_name = host.clone();
+        let dns_name = &self.request.host;
         let dns_name = dns_name.split(":").next().unwrap();
         let dns_name = DNSNameRef::try_from_ascii_str(dns_name).unwrap();
         let mut config = ClientConfig::new();
@@ -52,7 +51,7 @@ impl Connection {
         let mut sess = ClientSession::new(&Arc::new(config), dns_name);
 
         // IO
-        let mut stream = create_tcp_stream(host, self.timeout)?;
+        let mut stream = create_tcp_stream(&self.request.host, self.timeout)?;
         let mut tls = rustls::Stream::new(&mut sess, &mut stream);
         tls.write(&bytes)?;
         match read_from_stream(tls, is_head) {
@@ -64,11 +63,10 @@ impl Connection {
     /// Sends the [`Request`](struct.Request.html), consumes this
     /// connection, and returns a [`Response`](struct.Response.html).
     pub(crate) fn send(self) -> Result<Response, Error> {
-        let host = self.request.host.clone();
         let is_head = self.request.method == http::Method::Head;
-        let bytes = self.request.into_string().into_bytes();
+        let bytes = self.request.to_string().into_bytes();
 
-        let tcp = create_tcp_stream(host, self.timeout)?;
+        let tcp = create_tcp_stream(&self.request.host, self.timeout)?;
 
         // Send request
         let mut stream = BufWriter::new(tcp);
@@ -93,7 +91,9 @@ impl Connection {
     }
 }
 
-fn create_tcp_stream(host: String, timeout: Option<u64>) -> Result<TcpStream, Error> {
+fn create_tcp_stream<A>(host: A, timeout: Option<u64>) -> Result<TcpStream, Error>
+where A: ToSocketAddrs
+{
     let stream = TcpStream::connect(host)?;
     if let Some(secs) = timeout {
         let dur = Some(Duration::from_secs(secs));
