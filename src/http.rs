@@ -81,6 +81,15 @@ impl Request {
         }
     }
 
+    /// Sets the URL of the request.
+    pub fn with_url<T: Into<String>>(mut self, url: T) -> Request {
+        let (host, resource, https) = parse_url(url.into());
+        self.host = host;
+        self.resource = resource;
+        self.https = https;
+        self
+    }
+
     /// Adds a header to the request this is called on. Use this
     /// function to add headers to your requests.
     pub fn with_header<T: Into<String>, U: Into<String>>(mut self, key: T, value: U) -> Request {

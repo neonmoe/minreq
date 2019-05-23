@@ -17,6 +17,7 @@ use webpki_roots::TLS_SERVER_ROOTS;
 pub struct Connection {
     request: Request,
     timeout: Option<u64>,
+    redirects: Vec<String>,
 }
 
 impl Connection {
@@ -30,7 +31,11 @@ impl Connection {
                 Ok(t) => t.parse::<u64>().ok(),
                 Err(_) => None,
             });
-        Connection { request, timeout }
+        Connection {
+            request,
+            timeout,
+            redirects: Vec::new(),
+        }
     }
 
     /// Sends the [`Request`](struct.Request.html), consumes this
@@ -55,7 +60,7 @@ impl Connection {
         let mut tls = rustls::Stream::new(&mut sess, &mut stream);
         tls.write(&bytes)?;
         match read_from_stream(tls, is_head) {
-            Ok(result) => Ok(Response::from_string(result)),
+            Ok(result) => handle_redirects(self, Response::from_string(result)),
             Err(err) => Err(err),
         }
     }
@@ -76,7 +81,7 @@ impl Connection {
         let tcp = stream.into_inner()?;
         let mut stream = BufReader::new(tcp);
         match read_from_stream(&mut stream, is_head) {
-            Ok(response) => Ok(Response::from_string(response)),
+            Ok(response) => handle_redirects(self, Response::from_string(response)),
             Err(err) => match err.kind() {
                 ErrorKind::WouldBlock | ErrorKind::TimedOut => Err(Error::new(
                     ErrorKind::TimedOut,
@@ -88,6 +93,41 @@ impl Connection {
                 _ => Err(err),
             },
         }
+    }
+}
+
+fn handle_redirects(mut connection: Connection, response: Response) -> Result<Response, Error> {
+    let status_code = response.status_code;
+    match status_code {
+        301 | 302 | 303 | 307 => {
+            let url = response.headers.get("Location");
+            if url.is_none() {
+                return Err(Error::new(
+                    ErrorKind::Other,
+                    "'Location' header missing in redirect.",
+                ));
+            }
+            let url = url.unwrap();
+
+            if connection.redirects.contains(&url) {
+                Err(Error::new(ErrorKind::Other, "Infinite redirection loop."))
+            } else {
+                connection.redirects.push(url.clone());
+                connection.request = connection.request.with_url(url.clone());
+                if status_code == 303 {
+                    match connection.request.method {
+                        http::Method::Post | http::Method::Put | http::Method::Delete => {
+                            connection.request.method = http::Method::Get;
+                        }
+                        _ => {}
+                    }
+                }
+
+                connection.send()
+            }
+        }
+
+        _ => Ok(response),
     }
 }
 
