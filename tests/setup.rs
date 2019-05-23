@@ -1,6 +1,6 @@
 extern crate minreq;
 extern crate tiny_http;
-use self::tiny_http::{Method, Response, Server};
+use self::tiny_http::{Header, Method, Response, Server};
 use std::io::Error;
 use std::sync::Arc;
 use std::sync::{Once, ONCE_INIT};
@@ -40,6 +40,24 @@ pub fn setup() {
                     }
                     &Method::Get if url == "/a" => {
                         let response = Response::from_string(format!("j: {}", content));
+                        request.respond(response).ok();
+                    }
+                    &Method::Post if url == "/a" => {
+                        let response = Response::from_string("POST to /a is not valid.");
+                        request.respond(response).ok();
+                    }
+                    &Method::Get if url == "/redirect" => {
+                        let response = Response::empty(301).with_header(
+                            Header::from_bytes(&b"Location"[..], &b"http://0.0.0.0:35562/a"[..])
+                                .unwrap(),
+                        );
+                        request.respond(response).ok();
+                    }
+                    &Method::Post if url == "/redirect" => {
+                        let response = Response::empty(303).with_header(
+                            Header::from_bytes(&b"Location"[..], &b"http://0.0.0.0:35562/a"[..])
+                                .unwrap(),
+                        );
                         request.respond(response).ok();
                     }
                     &Method::Head if url == "/b" => {

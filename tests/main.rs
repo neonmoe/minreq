@@ -56,6 +56,24 @@ fn test_get() {
 }
 
 #[test]
+fn test_redirect_get() {
+    setup();
+    let body = get_body(minreq::get(url("/redirect")).with_body("Q").send());
+    assert_eq!(body, "j: Q");
+}
+
+#[test]
+fn test_redirect_post() {
+    setup();
+    // POSTing to /redirect should return a 303, which means we should
+    // make a GET request to the given location. This test relies on
+    // the fact that the test server only responds to GET requests on
+    // the /a path.
+    let body = get_body(minreq::post(url("/redirect")).with_body("Q").send());
+    assert_eq!(body, "j: Q");
+}
+
+#[test]
 fn test_head() {
     setup();
     assert_eq!(get_status_code(minreq::head(url("/b")).send()), 418);
