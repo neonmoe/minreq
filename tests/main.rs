@@ -74,6 +74,13 @@ fn test_redirect_post() {
 }
 
 #[test]
+fn test_infinite_redirect() {
+    setup();
+    let body = get_body(minreq::get(url("/infiniteredirect")).send());
+    assert_eq!(body, "j: Q");
+}
+
+#[test]
 fn test_head() {
     setup();
     assert_eq!(get_status_code(minreq::head(url("/b")).send()), 418);

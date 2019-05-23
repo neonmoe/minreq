@@ -17,7 +17,6 @@ use webpki_roots::TLS_SERVER_ROOTS;
 pub struct Connection {
     request: Request,
     timeout: Option<u64>,
-    redirects: Vec<String>,
 }
 
 impl Connection {
@@ -31,11 +30,7 @@ impl Connection {
                 Ok(t) => t.parse::<u64>().ok(),
                 Err(_) => None,
             });
-        Connection {
-            request,
-            timeout,
-            redirects: Vec::new(),
-        }
+        Connection { request, timeout }
     }
 
     /// Sends the [`Request`](struct.Request.html), consumes this
@@ -96,7 +91,7 @@ impl Connection {
     }
 }
 
-fn handle_redirects(mut connection: Connection, response: Response) -> Result<Response, Error> {
+fn handle_redirects(connection: Connection, response: Response) -> Result<Response, Error> {
     let status_code = response.status_code;
     match status_code {
         301 | 302 | 303 | 307 => {
@@ -108,22 +103,22 @@ fn handle_redirects(mut connection: Connection, response: Response) -> Result<Re
                 ));
             }
             let url = url.unwrap();
+            let mut request = connection.request;
 
-            if connection.redirects.contains(&url) {
+            if request.redirects.contains(&url) {
                 Err(Error::new(ErrorKind::Other, "Infinite redirection loop."))
             } else {
-                connection.redirects.push(url.clone());
-                connection.request = connection.request.with_url(url.clone());
+                request.redirect_to(url.clone());
                 if status_code == 303 {
-                    match connection.request.method {
+                    match request.method {
                         http::Method::Post | http::Method::Put | http::Method::Delete => {
-                            connection.request.method = http::Method::Get;
+                            request.method = http::Method::Get;
                         }
                         _ => {}
                     }
                 }
 
-                connection.request.send()
+                request.send()
             }
         }
 

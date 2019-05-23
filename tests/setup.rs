@@ -33,11 +33,13 @@ pub fn setup() {
                         }
                         request.respond(Response::from_string("No header!")).ok();
                     }
+
                     &Method::Get if url == "/slow_a" => {
                         thread::sleep(Duration::from_secs(2));
                         let response = Response::from_string(format!("j: {}", content));
                         request.respond(response).ok();
                     }
+
                     &Method::Get if url == "/a" => {
                         let response = Response::from_string(format!("j: {}", content));
                         request.respond(response).ok();
@@ -46,6 +48,7 @@ pub fn setup() {
                         let response = Response::from_string("POST to /a is not valid.");
                         request.respond(response).ok();
                     }
+
                     &Method::Get if url == "/redirect" => {
                         let response = Response::empty(301).with_header(
                             Header::from_bytes(&b"Location"[..], &b"http://0.0.0.0:35562/a"[..])
@@ -60,6 +63,28 @@ pub fn setup() {
                         );
                         request.respond(response).ok();
                     }
+
+                    &Method::Get if url == "/infiniteredirect" => {
+                        let response = Response::empty(301).with_header(
+                            Header::from_bytes(
+                                &b"Location"[..],
+                                &b"http://0.0.0.0:35562/redirectpong"[..],
+                            )
+                            .unwrap(),
+                        );
+                        request.respond(response).ok();
+                    }
+                    &Method::Get if url == "/redirectpong" => {
+                        let response = Response::empty(301).with_header(
+                            Header::from_bytes(
+                                &b"Location"[..],
+                                &b"http://0.0.0.0:35562/infiniteredirect"[..],
+                            )
+                            .unwrap(),
+                        );
+                        request.respond(response).ok();
+                    }
+
                     &Method::Head if url == "/b" => {
                         request.respond(Response::empty(418)).ok();
                     }

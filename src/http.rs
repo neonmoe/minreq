@@ -61,6 +61,7 @@ pub struct Request {
     body: Option<String>,
     pub(crate) timeout: Option<u64>,
     https: bool,
+    pub(crate) redirects: Vec<URL>,
 }
 
 impl Request {
@@ -78,16 +79,8 @@ impl Request {
             body: None,
             timeout: None,
             https,
+            redirects: Vec::new(),
         }
-    }
-
-    /// Sets the URL of the request.
-    pub fn with_url<T: Into<String>>(mut self, url: T) -> Request {
-        let (host, resource, https) = parse_url(url.into());
-        self.host = host;
-        self.resource = resource;
-        self.https = https;
-        self
     }
 
     /// Adds a header to the request this is called on. Use this
@@ -151,6 +144,16 @@ impl Request {
         }
         http
     }
+
+    pub(crate) fn redirect_to(&mut self, url: URL) {
+        self.redirects
+            .push(create_url(&self.host, &self.resource, self.https));
+
+        let (host, resource, https) = parse_url(url);
+        self.host = host;
+        self.resource = resource;
+        self.https = https;
+    }
 }
 
 /// An HTTP response.
@@ -178,6 +181,11 @@ impl Response {
             body,
         }
     }
+}
+
+fn create_url(host: &URL, resource: &URL, https: bool) -> URL {
+    let prefix = if https { "https://" } else { "http://" };
+    return format!("{}{}{}", prefix, host, resource);
 }
 
 fn parse_url(url: URL) -> (URL, URL, bool) {
