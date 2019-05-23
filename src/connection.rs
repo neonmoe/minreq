@@ -123,7 +123,7 @@ fn handle_redirects(mut connection: Connection, response: Response) -> Result<Re
                     }
                 }
 
-                connection.send()
+                connection.request.send()
             }
         }
 
