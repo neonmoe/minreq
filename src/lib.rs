@@ -12,7 +12,7 @@
 //! Cargo.toml's `[dependencies]` part to something like the
 //! following:
 //! ```toml
-//! minreq = { version = "1.0.0", features = ["https"] }
+//! minreq = { version = "1.1.3", features = ["https"] }
 //! ```
 //!
 //! # Examples
