@@ -2,7 +2,6 @@ use crate::connection::Connection;
 use std::collections::HashMap;
 use std::fmt;
 use std::io::Error;
-use std::str::Lines;
 
 /// A URL type for requests.
 pub type URL = String;
@@ -170,10 +169,8 @@ pub struct Response {
 
 impl Response {
     pub(crate) fn from_string(response_text: String) -> Response {
-        let mut lines = response_text.lines();
-        let status_line = lines.next().unwrap_or("");
-        let (status_code, reason_phrase) = parse_status_line(status_line);
-        let (headers, body) = parse_http_response_content(lines);
+        let (status_code, reason_phrase) = parse_status_line(&response_text);
+        let (headers, body) = parse_http_response_content(response_text);
         Response {
             status_code,
             reason_phrase,
@@ -214,35 +211,37 @@ fn parse_url(url: URL) -> (URL, URL, bool) {
     (first, second, https)
 }
 
-pub(crate) fn parse_status_line(line: &str) -> (i32, String) {
-    let mut split = line.split(' ');
-    if let Some(code) = split.nth(1) {
-        if let Ok(code) = code.parse::<i32>() {
-            if let Some(reason) = split.next() {
-                return (code, reason.to_string());
+pub(crate) fn parse_status_line(http_response: &str) -> (i32, String) {
+    if let Some(line) = http_response.split("\r\n").next() {
+        let mut split = line.split(' ');
+        if let Some(code) = split.nth(1) {
+            if let Ok(code) = code.parse::<i32>() {
+                if let Some(reason) = split.next() {
+                    return (code, reason.to_string());
+                }
             }
         }
     }
     (503, "Server did not provide a status line".to_string())
 }
 
-fn parse_http_response_content(lines: Lines) -> (HashMap<String, String>, String) {
+fn parse_http_response_content(http_response: String) -> (HashMap<String, String>, String) {
+    let mut response_parts = http_response.split("\r\n\r\n");
+
     let mut headers = HashMap::new();
-    let mut body = String::new();
-    let mut writing_headers = true;
-    for line in lines {
-        if line.is_empty() {
-            writing_headers = false;
-            continue;
-        }
-        if writing_headers {
-            if let Some((key, value)) = parse_header(line) {
+    if let Some(headers_text) = response_parts.next() {
+        let mut status_line = true;
+        for line in headers_text.lines() {
+            if status_line {
+                status_line = false;
+                continue;
+            } else if let Some((key, value)) = parse_header(line) {
                 headers.insert(key, value);
             }
-        } else {
-            body += &format!("{}\r\n", line);
         }
     }
+    let body = response_parts.next().unwrap_or("").to_owned();
+
     (headers, body)
 }
 

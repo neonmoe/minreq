@@ -103,13 +103,13 @@ fn test_put() {
 #[test]
 fn test_delete() {
     setup();
-    assert_eq!(get_body(minreq::delete(url("/e")).send()), "n:");
+    assert_eq!(get_body(minreq::delete(url("/e")).send()), "n: ");
 }
 
 #[test]
 fn test_trace() {
     setup();
-    assert_eq!(get_body(minreq::trace(url("/f")).send()), "o:");
+    assert_eq!(get_body(minreq::trace(url("/f")).send()), "o: ");
 }
 
 #[test]
