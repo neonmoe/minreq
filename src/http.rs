@@ -165,17 +165,21 @@ pub struct Response {
     pub headers: HashMap<String, String>,
     /// The body of the response.
     pub body: String,
+    /// The body of the response, as raw bytes.
+    pub body_bytes: Vec<u8>,
 }
 
 impl Response {
-    pub(crate) fn from_string(response_text: String) -> Response {
-        let (status_code, reason_phrase) = parse_status_line(&response_text);
-        let (headers, body) = parse_http_response_content(response_text);
+    pub(crate) fn from_bytes(bytes: Vec<u8>) -> Response {
+        let (status_code, reason_phrase) = parse_status_line(&bytes);
+        let (headers, body_bytes) = parse_http_response_content(&bytes);
         Response {
             status_code,
             reason_phrase,
             headers,
-            body,
+            // FIXME: Make body an Option?
+            body: std::str::from_utf8(&body_bytes).unwrap_or("").to_owned(),
+            body_bytes,
         }
     }
 }
@@ -211,8 +215,9 @@ fn parse_url(url: URL) -> (URL, URL, bool) {
     (first, second, https)
 }
 
-pub(crate) fn parse_status_line(http_response: &str) -> (i32, String) {
-    if let Some(line) = http_response.split("\r\n").next() {
+pub(crate) fn parse_status_line(http_response: &[u8]) -> (i32, String) {
+    let (line, _) = split_at(http_response, "\r\n");
+    if let Ok(line) = std::str::from_utf8(line) {
         let mut split = line.split(' ');
         if let Some(code) = split.nth(1) {
             if let Ok(code) = code.parse::<i32>() {
@@ -225,24 +230,33 @@ pub(crate) fn parse_status_line(http_response: &str) -> (i32, String) {
     (503, "Server did not provide a status line".to_string())
 }
 
-fn parse_http_response_content(http_response: String) -> (HashMap<String, String>, String) {
-    let mut response_parts = http_response.split("\r\n\r\n");
+fn parse_http_response_content(http_response: &[u8]) -> (HashMap<String, String>, Vec<u8>) {
+    let (headers_text, body) = split_at(http_response, "\r\n\r\n");
 
     let mut headers = HashMap::new();
-    if let Some(headers_text) = response_parts.next() {
-        let mut status_line = true;
-        for line in headers_text.lines() {
-            if status_line {
-                status_line = false;
-                continue;
-            } else if let Some((key, value)) = parse_header(line) {
-                headers.insert(key, value);
+    let mut status_line = true;
+    let headers_text = std::str::from_utf8(headers_text).unwrap();
+    for line in headers_text.lines() {
+        if status_line {
+            status_line = false;
+            continue;
+        } else if let Some((key, value)) = parse_header(line) {
+            headers.insert(key, value);
+        }
+    }
+
+    (headers, body.to_vec())
+}
+
+fn split_at<'a>(bytes: &'a [u8], splitter: &str) -> (&'a [u8], &'a [u8]) {
+    for i in 0..bytes.len() - splitter.len() {
+        if let Ok(s) = std::str::from_utf8(&bytes[i..i + splitter.len()]) {
+            if s == splitter {
+                return (&bytes[..i], &bytes[i + splitter.len()..]);
             }
         }
     }
-    let body = response_parts.next().unwrap_or("").to_owned();
-
-    (headers, body)
+    (bytes, &[])
 }
 
 pub(crate) fn parse_header(line: &str) -> Option<(String, String)> {

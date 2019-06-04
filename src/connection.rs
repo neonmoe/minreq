@@ -55,7 +55,7 @@ impl Connection {
         let mut tls = rustls::Stream::new(&mut sess, &mut stream);
         tls.write(&bytes)?;
         match read_from_stream(tls, is_head) {
-            Ok(result) => handle_redirects(self, Response::from_string(result)),
+            Ok(result) => handle_redirects(self, Response::from_bytes(result)),
             Err(err) => Err(err),
         }
     }
@@ -76,7 +76,7 @@ impl Connection {
         let tcp = stream.into_inner()?;
         let mut stream = BufReader::new(tcp);
         match read_from_stream(&mut stream, is_head) {
-            Ok(response) => handle_redirects(self, Response::from_string(response)),
+            Ok(response) => handle_redirects(self, Response::from_bytes(response)),
             Err(err) => match err.kind() {
                 ErrorKind::WouldBlock | ErrorKind::TimedOut => Err(Error::new(
                     ErrorKind::TimedOut,
@@ -140,8 +140,8 @@ where A: ToSocketAddrs
 
 /// Reads the stream until it can't or it reaches the end of the HTTP
 /// response.
-fn read_from_stream<T: Read>(stream: T, head: bool) -> Result<String, Error> {
-    let mut response = String::new();
+fn read_from_stream<T: Read>(stream: T, head: bool) -> Result<Vec<u8>, Error> {
+    let mut response = Vec::new();
     let mut response_length = None;
     let mut chunked = false;
     let mut expecting_chunk_length = false;
@@ -152,10 +152,9 @@ fn read_from_stream<T: Read>(stream: T, head: bool) -> Result<String, Error> {
 
     for byte in stream.bytes() {
         let byte = byte?;
-        let c = byte as char;
-        response.push(c);
+        response.push(byte);
         byte_count += 1;
-        if c == '\n' {
+        if byte == b'\n' {
             if status_code.is_none() {
                 // First line
                 status_code = Some(http::parse_status_line(&response).0);
@@ -169,34 +168,41 @@ fn read_from_stream<T: Read>(stream: T, head: bool) -> Result<String, Error> {
                     }
                 }
                 if response_length.is_none() {
-                    let len = get_response_length(&response);
-                    response_length = Some(len);
-                    if len > response.len() {
-                        response.reserve(len - response.len());
+                    if let Ok(response_str) = std::str::from_utf8(&response) {
+                        let len = get_response_length(response_str);
+                        response_length = Some(len);
+                        if len > response.len() {
+                            response.reserve(len - response.len());
+                        }
                     }
                 }
-            } else if expecting_chunk_length {
-                expecting_chunk_length = false;
-                if let Ok(n) = usize::from_str_radix(&response[last_newline_index..].trim(), 16) {
-                    // Cut out the chunk length from the reponse
-                    response.truncate(last_newline_index);
-                    byte_count = last_newline_index;
-                    // Update response length according to the new chunk length
-                    if n == 0 {
-                        break;
-                    } else {
-                        response_length = Some(byte_count + n + 2);
+            } else if let Ok(new_response_length_str) =
+                std::str::from_utf8(&response[last_newline_index..])
+            {
+                if expecting_chunk_length {
+                    expecting_chunk_length = false;
+
+                    if let Ok(n) = usize::from_str_radix(new_response_length_str.trim(), 16) {
+                        // Cut out the chunk length from the reponse
+                        response.truncate(last_newline_index);
+                        byte_count = last_newline_index;
+                        // Update response length according to the new chunk length
+                        if n == 0 {
+                            break;
+                        } else {
+                            response_length = Some(byte_count + n + 2);
+                        }
                     }
-                }
-            } else if let Some((key, value)) = http::parse_header(&response[last_newline_index..]) {
-                if key.trim() == "Transfer-Encoding" && value.trim() == "chunked" {
-                    chunked = true;
+                } else if let Some((key, value)) = http::parse_header(new_response_length_str) {
+                    if key.trim() == "Transfer-Encoding" && value.trim() == "chunked" {
+                        chunked = true;
+                    }
                 }
             }
 
             blank_line = true;
             last_newline_index = byte_count;
-        } else if c != '\r' {
+        } else if byte != b'\r' {
             // Normal character, reset blank_line
             blank_line = false;
         }
