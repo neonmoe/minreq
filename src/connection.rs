@@ -42,8 +42,8 @@ impl Connection {
 
         // Rustls setup
         let dns_name = &self.request.host;
-        let dns_name = dns_name.split(":").next().unwrap();
-        let dns_name = DNSNameRef::try_from_ascii_str(dns_name).unwrap();
+        let dns_name = dns_name.split(":").next()?;
+        let dns_name = DNSNameRef::try_from_ascii_str(dns_name)?;
         let mut config = ClientConfig::new();
         config
             .root_store
@@ -127,7 +127,8 @@ fn handle_redirects(connection: Connection, response: Response) -> Result<Respon
 }
 
 fn create_tcp_stream<A>(host: A, timeout: Option<u64>) -> Result<TcpStream, Error>
-where A: ToSocketAddrs
+where
+    A: ToSocketAddrs,
 {
     let stream = TcpStream::connect(host)?;
     if let Some(secs) = timeout {
@@ -233,7 +234,9 @@ fn get_response_length(response: &str) -> usize {
     for line in response.lines() {
         byte_count += line.len() + 2;
         if line.starts_with("Content-Length: ") {
-            byte_count += line.clone()[16..].parse::<usize>().unwrap();
+            if let Ok(length) = line[16..].parse::<usize>() {
+                byte_count += length;
+            }
         }
     }
     byte_count

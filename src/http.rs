@@ -138,7 +138,7 @@ impl Request {
         }
         // Add the body
         http += "\r\n";
-        if let &Some(ref body) = &self.body {
+        if let Some(ref body) = &self.body {
             http += body;
         }
         http
@@ -184,7 +184,7 @@ impl Response {
     }
 }
 
-fn create_url(host: &URL, resource: &URL, https: bool) -> URL {
+fn create_url(host: &str, resource: &str, https: bool) -> URL {
     let prefix = if https { "https://" } else { "http://" };
     return format!("{}{}{}", prefix, host, resource);
 }
@@ -235,13 +235,14 @@ fn parse_http_response_content(http_response: &[u8]) -> (HashMap<String, String>
 
     let mut headers = HashMap::new();
     let mut status_line = true;
-    let headers_text = std::str::from_utf8(headers_text).unwrap();
-    for line in headers_text.lines() {
-        if status_line {
-            status_line = false;
-            continue;
-        } else if let Some((key, value)) = parse_header(line) {
-            headers.insert(key, value);
+    if let Ok(headers_text) = std::str::from_utf8(headers_text) {
+        for line in headers_text.lines() {
+            if status_line {
+                status_line = false;
+                continue;
+            } else if let Some((key, value)) = parse_header(line) {
+                headers.insert(key, value);
+            }
         }
     }
 
