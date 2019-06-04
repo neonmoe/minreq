@@ -42,8 +42,8 @@ impl Connection {
 
         // Rustls setup
         let dns_name = &self.request.host;
-        let dns_name = dns_name.split(":").next()?;
-        let dns_name = DNSNameRef::try_from_ascii_str(dns_name)?;
+        let dns_name = dns_name.split(":").next().unwrap();
+        let dns_name = DNSNameRef::try_from_ascii_str(dns_name).unwrap();
         let mut config = ClientConfig::new();
         config
             .root_store
