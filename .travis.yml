@@ -8,3 +8,5 @@ script:
   - cargo test --features "https"
   - cargo test --release
   - cargo test --features "https" --release
+  - cargo test --features "json-using-serde"
+  - cargo test --features "json-using-serde" --release

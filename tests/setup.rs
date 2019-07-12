@@ -85,6 +85,10 @@ pub fn setup() {
                         request.respond(response).ok();
                     }
 
+                    &Method::Post if url == "/echo" => {
+                        request.respond(Response::from_string(content)).ok();
+                    }
+
                     &Method::Head if url == "/b" => {
                         request.respond(Response::empty(418)).ok();
                     }

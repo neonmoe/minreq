@@ -97,6 +97,13 @@ impl Request {
         self.with_header("Content-Length", format!("{}", body_length))
     }
 
+    /// Converts given argument to JSON and sets it as body.
+    #[cfg(feature = "json-using-serde")]
+    pub fn with_json<T: serde::ser::Serialize>(mut self, body: &T) -> Result<Request, serde_json::Error> {
+        self.headers.insert("Content-Type".to_string(), "application/json; charset=UTF-8".to_string());
+        Ok(self.with_body(serde_json::to_string(&body)?))
+    }
+
     /// Sets the request timeout.
     pub fn with_timeout(mut self, timeout: u64) -> Request {
         self.timeout = Some(timeout);
@@ -181,6 +188,34 @@ impl Response {
             body: std::str::from_utf8(&body_bytes).unwrap_or("").to_owned(),
             body_bytes,
         }
+    }
+
+    /// Converts JSON body to a `struct` using Serde.
+    ///
+    /// In case compiler cannot figure out return type you might need to declare it explicitly:
+    ///
+    /// ```no_run
+    /// use serde_derive::Deserialize;
+    ///
+    /// #[derive(Deserialize)]
+    /// struct User {
+    ///     name: String,
+    ///     email: String,
+    /// }
+    ///
+    /// # fn main() {
+    /// # let url_to_json_resource = "http://example.org/resource.json";
+    /// let user_name = minreq::get(url_to_json_resource)
+    ///     .send().unwrap()
+    ///     .json::<User>().unwrap() // explicitly declared type `User`
+    ///     .name;
+    /// println!("User name is '{}'", &user_name);
+    /// # }
+    /// ```
+    #[cfg(feature = "json-using-serde")]
+    pub fn json<'a, T>(&'a self) -> Result<T, serde_json::Error>
+    where T: serde::de::Deserialize<'a> {
+        serde_json::from_str(&self.body)
     }
 }
 
