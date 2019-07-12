@@ -7,7 +7,7 @@ documentation = "https://docs.rs/minreq"
 homepage = "https://github.com/neonmoe/minreq"
 repository = "https://github.com/neonmoe/minreq"
 readme = "README.md"
-keywords = ["http", "https", "client", "request"]
+keywords = ["http", "https", "client", "request", "json"]
 categories = ["web-programming::http-client"]
 license = "ISC"
 edition = "2018"
@@ -20,11 +20,15 @@ maintenance = { status = "passively-maintained" }
 rustls = { version = "0.15", optional = true }
 webpki-roots = { version = "0.16", optional = true }
 webpki = { version = "0.19", optional = true }
+serde = { version = "1.0.60", optional = true }
+serde_json = { version = "1.0.40", optional = true }
 
 [dev-dependencies]
 tiny_http = "0.6"
+serde_derive = "1.0.60"
 
 [features]
 default = []
 
 https = ["rustls", "webpki-roots", "webpki"]
+json-using-serde = ["serde", "serde_json"]
