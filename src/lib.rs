@@ -102,14 +102,14 @@
 
 #[cfg(feature = "https")]
 extern crate rustls;
-#[cfg(feature = "https")]
-extern crate webpki;
-#[cfg(feature = "https")]
-extern crate webpki_roots;
 #[cfg(feature = "json-using-serde")]
 extern crate serde;
 #[cfg(feature = "json-using-serde")]
 extern crate serde_json;
+#[cfg(feature = "https")]
+extern crate webpki;
+#[cfg(feature = "https")]
+extern crate webpki_roots;
 
 mod connection;
 mod http;

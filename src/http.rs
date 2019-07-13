@@ -99,8 +99,14 @@ impl Request {
 
     /// Converts given argument to JSON and sets it as body.
     #[cfg(feature = "json-using-serde")]
-    pub fn with_json<T: serde::ser::Serialize>(mut self, body: &T) -> Result<Request, serde_json::Error> {
-        self.headers.insert("Content-Type".to_string(), "application/json; charset=UTF-8".to_string());
+    pub fn with_json<T: serde::ser::Serialize>(
+        mut self,
+        body: &T,
+    ) -> Result<Request, serde_json::Error> {
+        self.headers.insert(
+            "Content-Type".to_string(),
+            "application/json; charset=UTF-8".to_string(),
+        );
         Ok(self.with_body(serde_json::to_string(&body)?))
     }
 
@@ -214,7 +220,9 @@ impl Response {
     /// ```
     #[cfg(feature = "json-using-serde")]
     pub fn json<'a, T>(&'a self) -> Result<T, serde_json::Error>
-    where T: serde::de::Deserialize<'a> {
+    where
+        T: serde::de::Deserialize<'a>,
+    {
         serde_json::from_str(&self.body)
     }
 }
