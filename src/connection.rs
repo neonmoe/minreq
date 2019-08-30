@@ -12,6 +12,17 @@ use webpki::DNSNameRef;
 #[cfg(feature = "https")]
 use webpki_roots::TLS_SERVER_ROOTS;
 
+#[cfg(feature = "https")]
+lazy_static::lazy_static! {
+    static ref CONFIG: Arc<ClientConfig> = {
+        let mut config = ClientConfig::new();
+        config
+            .root_store
+            .add_server_trust_anchors(&TLS_SERVER_ROOTS);
+        Arc::new(config)
+    };
+}
+
 /// A connection to the server for sending
 /// [`Request`](struct.Request.html)s.
 pub struct Connection {
@@ -44,11 +55,7 @@ impl Connection {
         let dns_name = &self.request.host;
         let dns_name = dns_name.split(":").next().unwrap();
         let dns_name = DNSNameRef::try_from_ascii_str(dns_name).unwrap();
-        let mut config = ClientConfig::new();
-        config
-            .root_store
-            .add_server_trust_anchors(&TLS_SERVER_ROOTS);
-        let mut sess = ClientSession::new(&Arc::new(config), dns_name);
+        let mut sess = ClientSession::new(&CONFIG, dns_name);
 
         // IO
         let mut stream = create_tcp_stream(&self.request.host, self.timeout)?;
