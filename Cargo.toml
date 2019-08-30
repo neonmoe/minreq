@@ -20,6 +20,7 @@ maintenance = { status = "passively-maintained" }
 rustls = { version = "0.15", optional = true }
 webpki-roots = { version = "0.16", optional = true }
 webpki = { version = "0.19", optional = true }
+lazy_static = { version = "1.4", optional = true }
 serde = { version = "1.0.60", optional = true }
 serde_json = { version = "1.0.40", optional = true }
 
@@ -30,5 +31,5 @@ serde_derive = "1.0.60"
 [features]
 default = []
 
-https = ["rustls", "webpki-roots", "webpki"]
+https = ["rustls", "webpki-roots", "webpki", "lazy_static"]
 json-using-serde = ["serde", "serde_json"]
