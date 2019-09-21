@@ -11,7 +11,7 @@ static INIT: Once = ONCE_INIT;
 
 pub fn setup() {
     INIT.call_once(|| {
-        let server = Arc::new(Server::http("0.0.0.0:35562").unwrap());
+        let server = Arc::new(Server::http("localhost:35562").unwrap());
         for _ in 0..4 {
             let server = server.clone();
 
@@ -51,14 +51,14 @@ pub fn setup() {
 
                     &Method::Get if url == "/redirect" => {
                         let response = Response::empty(301).with_header(
-                            Header::from_bytes(&b"Location"[..], &b"http://0.0.0.0:35562/a"[..])
+                            Header::from_bytes(&b"Location"[..], &b"http://localhost:35562/a"[..])
                                 .unwrap(),
                         );
                         request.respond(response).ok();
                     }
                     &Method::Post if url == "/redirect" => {
                         let response = Response::empty(303).with_header(
-                            Header::from_bytes(&b"Location"[..], &b"http://0.0.0.0:35562/a"[..])
+                            Header::from_bytes(&b"Location"[..], &b"http://localhost:35562/a"[..])
                                 .unwrap(),
                         );
                         request.respond(response).ok();
@@ -68,7 +68,7 @@ pub fn setup() {
                         let response = Response::empty(301).with_header(
                             Header::from_bytes(
                                 &b"Location"[..],
-                                &b"http://0.0.0.0:35562/redirectpong"[..],
+                                &b"http://localhost:35562/redirectpong"[..],
                             )
                             .unwrap(),
                         );
@@ -78,7 +78,7 @@ pub fn setup() {
                         let response = Response::empty(301).with_header(
                             Header::from_bytes(
                                 &b"Location"[..],
-                                &b"http://0.0.0.0:35562/infiniteredirect"[..],
+                                &b"http://localhost:35562/infiniteredirect"[..],
                             )
                             .unwrap(),
                         );
@@ -133,7 +133,7 @@ pub fn setup() {
 }
 
 pub fn url(req: &str) -> String {
-    format!("http://0.0.0.0:35562{}", req)
+    format!("http://localhost:35562{}", req)
 }
 
 pub fn get_body(request: Result<minreq::Response, Error>) -> String {
