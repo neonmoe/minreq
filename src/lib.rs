@@ -34,9 +34,31 @@
 //! ## Get
 //! ```no_run
 //! // This is a simple example of sending a GET request and
-//! // printing out the response.
+//! // printing out the response. The unwrap is needed because
+//! // the server could return invalid UTF-8.
 //! if let Ok(response) = minreq::get("http://httpbin.org/ip").send() {
-//!     println!("{}", response.body);
+//!     println!("{}", response.as_str().unwrap());
+//! }
+//! ```
+//!
+//! ## Get, but read during the download
+//! ```no_run
+//! // This is an example similar to the Get example above, but
+//! // instead of downloading the whole response before printing it, this
+//! // prints the response during the download. This doesn't handle UTF-8
+//! // validity however, as it's printed char-by-char, instead of being
+//! // converted into an str (which must be valid UTF-8).
+//!
+//! use std::io::Write;
+//! if let Ok(mut response) = minreq::get("http://httpbin.org/ip")
+//!     .with_load_later(true)
+//!     .send()
+//! {
+//!     for byte in response.as_iter_mut().unwrap() {
+//!         // Print every byte `as` char, as the body is still being downloaded.
+//!         print!("{}", byte as char);
+//!         std::io::stdout().flush();
+//!     }
 //! }
 //! ```
 //!
@@ -47,7 +69,7 @@
 //!     .with_body("Pong!")
 //!     .send()
 //! {
-//!     println!("{}", response.body);
+//!     println!("{}", response.as_str().unwrap());
 //! }
 //! ```
 //!
@@ -59,7 +81,7 @@
 //!     .with_header("Something", "Interesting")
 //!     .send()
 //! {
-//!     println!("{}", response.body);
+//!     println!("{}", response.as_str().unwrap());
 //! }
 //! ```
 //!
@@ -72,15 +94,14 @@
 //!     .with_timeout(10)
 //!     .send()
 //! {
-//!     println!("{}", response.body);
+//!     println!("{}", response.as_str().unwrap());
 //! }
 //! ```
 //!
 //! # Timeouts
 //! By default, a request has no timeout.  You can change this in two ways:
-//! - Use this function (`create_request`) and call
-//!   [`with_timeout`](struct.Request.html#method.with_timeout)
-//!   on it to set the timeout per-request like so:
+//! - Use [`with_timeout`](struct.Request.html#method.with_timeout) on
+//!   your request to set the timeout per-request like so:
 //!   ```
 //!   minreq::get("/").with_timeout(8).send();
 //!   ```

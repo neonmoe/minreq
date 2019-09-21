@@ -5,13 +5,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- Loading HTTP responses through an iterator, allowing processing the
+  data during the download.
+
 ### Changed
 - Updated dependencies
+- Restructure the `Response` struct in a major, breaking way.
 
 ### Fixed
 - Changed ip in tests from `0.0.0.0` to `localhost` to fix them
   running on Windows.
-- Restructure the `Response` struct in a major, breaking way.
 
 ## [1.4.0] - 2019-07-13
 ### Added

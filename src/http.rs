@@ -62,6 +62,7 @@ pub struct Request {
     pub(crate) timeout: Option<u64>,
     https: bool,
     pub(crate) redirects: Vec<URL>,
+    load_later: bool,
 }
 
 impl Request {
@@ -80,6 +81,7 @@ impl Request {
             timeout: None,
             https,
             redirects: Vec::new(),
+            load_later: false,
         }
     }
 
@@ -114,6 +116,26 @@ impl Request {
     /// Sets the request timeout.
     pub fn with_timeout(mut self, timeout: u64) -> Request {
         self.timeout = Some(timeout);
+        self
+    }
+
+    /// Indicates that the response's body should be read by the
+    /// caller through an iterator, instead of being loaded during
+    /// [`send()`](#method.send).
+    ///
+    /// This means that when the request is made, the response's
+    /// headers are read, and reading the body is left to you, via
+    /// iterating through
+    /// [`Response::as_iter_mut()`](struct.Response.html#method.as_iter_mut).
+    ///
+    /// When using this option, you should be wary of using
+    /// [`Response::as_str()`](struct.Response.html#method.as_str) and
+    /// [`Response::as_bytes()`](struct.Response.html#method.as_bytes),
+    /// as they return what they return based on which bytes have been
+    /// iterated through at the poitn of calling them, ie. probably
+    /// not the whole body.
+    pub fn with_load_later(mut self, load_later: bool) -> Request {
+        self.load_later = load_later;
         self
     }
 

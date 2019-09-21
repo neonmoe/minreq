@@ -2,23 +2,45 @@ use crate::http;
 use std::collections::HashMap;
 use std::str;
 
+/// An iterator for processing the response from the server during
+/// the download.
+///
+/// To get access to this, construct your Request with
+/// [`Request::with_load_later(true)`](struct.Request.html#method.with_load_later),
+/// and then you can access this iterator through
+/// [`Response::as_iter_mut()`](struct.Response.html#method.as_iter_mut).
+///
+/// # Usage
+/// ```no_run
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// # let url = "http://example.org/";
+/// let mut response = minreq::get(url).with_load_later(true).send()?;
+/// for byte in response.as_iter_mut().unwrap() {
+///     println!("{}", byte as char);
+/// }
+/// # Ok(())
+/// # }
+/// ```
+#[derive(Debug)]
+pub struct ResponseIter {
+    loaded_bytes: Vec<u8>,
+}
+
+impl Iterator for ResponseIter {
+    type Item = u8;
+
+    /// Reads the next byte from the incoming HTTP response's body.
+    fn next(&mut self) -> Option<Self::Item> {
+        None
+    }
+}
+
+enum Body {
+    Loaded(Vec<u8>),
+    Loading(ResponseIter),
+}
+
 /// An HTTP response.
-///
-/// The behaviour is as follows:
-///
-/// 1. When the `Response` is created, the headers of the response are
-/// read, and used to initialize this struct.
-///
-/// 2. Now that you have a `Response`, you can either prepare it for
-/// usage by simply calling `load()`, which reads the rest of the
-/// message. Alternatively, you can iterate through the returned
-/// response while it is being loaded, with `as_iter()`.
-///
-/// The function [`load_str()`](#method.load_str) exists to enable
-/// writing nice, concise one-liners. In case you want to hold on to
-/// the Response for a while, and read it later,
-/// [`as_str()`](#method.as_str) and [`as_bytes()`](#method.as_bytes)
-/// are the functions for you.
 pub struct Response {
     /// The status code of the response, eg. 404.
     pub status_code: i32,
@@ -27,7 +49,7 @@ pub struct Response {
     /// The headers of the response.
     pub headers: HashMap<String, String>,
     /// The body of the response.
-    body: Vec<u8>,
+    body: Body,
 }
 
 impl Response {
@@ -38,17 +60,22 @@ impl Response {
             status_code,
             reason_phrase,
             headers,
-            body: body_bytes,
+            body: Body::Loaded(body_bytes),
         }
     }
 
-    /// Loads the rest of the HTTP response synchronously.
+    /// Returns an iterator for reading the response as it's being
+    /// loaded.
     ///
-    /// If the response has been loaded, this does nothing.
-    #[allow(unused_mut)]
-    pub fn load(mut self) -> Response {
-        // TODO: load the stuff
-        self
+    /// If the request wasn't constructed with
+    /// [`Request::with_load_later(true)`](struct.Request.html#method.with_load_later),
+    /// this will always return None.
+    pub fn as_iter_mut(&mut self) -> Option<&mut ResponseIter> {
+        if let Body::Loading(ref mut iter) = self.body {
+            Some(iter)
+        } else {
+            None
+        }
     }
 
     /// Returns a `&str` constructed from the bytes returned so
@@ -64,28 +91,36 @@ impl Response {
     /// ```no_run
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let url = "http://example.org/";
-    /// let response = minreq::get(url).send()?.load();
+    /// let response = minreq::get(url).send()?;
     /// println!("{}", response.as_str()?);
     /// # Ok(())
     /// # }
     /// ```
     pub fn as_str(&self) -> Result<&str, str::Utf8Error> {
-        str::from_utf8(&self.body)
+        match self.body {
+            Body::Loaded(ref slice) => str::from_utf8(slice),
+            Body::Loading(ref iter) => str::from_utf8(&iter.loaded_bytes),
+        }
     }
 
-    /// Returns a reference to the bytes returned so far.
+    /// Returns a reference to the bytes of the body.
+    ///
+    /// If the request was made with `.load_later()`
     ///
     /// Usage:
     /// ```no_run
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let url = "http://example.org/";
-    /// let response = minreq::get(url).send()?.load();
+    /// let response = minreq::get(url).send()?;
     /// println!("{:?}", response.as_bytes());
     /// # Ok(())
     /// # }
     /// ```
     pub fn as_bytes(&self) -> &[u8] {
-        &self.body
+        match self.body {
+            Body::Loaded(ref slice) => slice,
+            Body::Loading(ref iter) => &iter.loaded_bytes,
+        }
     }
 
     /// Converts JSON body to a `struct` using Serde.
@@ -116,12 +151,5 @@ impl Response {
         T: serde::de::Deserialize<'a>,
     {
         serde_json::from_str(&self.body)
-    }
-
-    /// Loads the rest of the HTTP response synchronously. Ensures
-    /// that `self.body` is not `None` after calling this.
-    fn load_body_sync(&mut self) {
-        // TODO: Implement me!
-        unimplemented!();
     }
 }
