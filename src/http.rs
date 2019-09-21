@@ -1,4 +1,5 @@
 use crate::connection::Connection;
+use crate::response::Response;
 use std::collections::HashMap;
 use std::fmt;
 use std::io::Error;
@@ -168,65 +169,6 @@ impl Request {
     }
 }
 
-/// An HTTP response.
-pub struct Response {
-    /// The status code of the response, eg. 404.
-    pub status_code: i32,
-    /// The reason phrase of the response, eg. "Not Found".
-    pub reason_phrase: String,
-    /// The headers of the response.
-    pub headers: HashMap<String, String>,
-    /// The body of the response.
-    pub body: String,
-    /// The body of the response, as raw bytes.
-    pub body_bytes: Vec<u8>,
-}
-
-impl Response {
-    pub(crate) fn from_bytes(bytes: Vec<u8>) -> Response {
-        let (status_code, reason_phrase) = parse_status_line(&bytes);
-        let (headers, body_bytes) = parse_http_response_content(&bytes);
-        Response {
-            status_code,
-            reason_phrase,
-            headers,
-            // FIXME: Make body an Option?
-            body: std::str::from_utf8(&body_bytes).unwrap_or("").to_owned(),
-            body_bytes,
-        }
-    }
-
-    /// Converts JSON body to a `struct` using Serde.
-    ///
-    /// In case compiler cannot figure out return type you might need to declare it explicitly:
-    ///
-    /// ```no_run
-    /// use serde_derive::Deserialize;
-    ///
-    /// #[derive(Deserialize)]
-    /// struct User {
-    ///     name: String,
-    ///     email: String,
-    /// }
-    ///
-    /// # fn main() {
-    /// # let url_to_json_resource = "http://example.org/resource.json";
-    /// let user_name = minreq::get(url_to_json_resource)
-    ///     .send().unwrap()
-    ///     .json::<User>().unwrap() // explicitly declared type `User`
-    ///     .name;
-    /// println!("User name is '{}'", &user_name);
-    /// # }
-    /// ```
-    #[cfg(feature = "json-using-serde")]
-    pub fn json<'a, T>(&'a self) -> Result<T, serde_json::Error>
-    where
-        T: serde::de::Deserialize<'a>,
-    {
-        serde_json::from_str(&self.body)
-    }
-}
-
 fn create_url(host: &str, resource: &str, https: bool) -> URL {
     let prefix = if https { "https://" } else { "http://" };
     return format!("{}{}{}", prefix, host, resource);
@@ -273,7 +215,9 @@ pub(crate) fn parse_status_line(http_response: &[u8]) -> (i32, String) {
     (503, "Server did not provide a status line".to_string())
 }
 
-fn parse_http_response_content(http_response: &[u8]) -> (HashMap<String, String>, Vec<u8>) {
+pub(crate) fn parse_http_response_content(
+    http_response: &[u8],
+) -> (HashMap<String, String>, Vec<u8>) {
     let (headers_text, body) = split_at(http_response, "\r\n\r\n");
 
     let mut headers = HashMap::new();

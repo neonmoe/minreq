@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Changed ip in tests from `0.0.0.0` to `localhost` to fix them
   running on Windows.
+- Restructure the `Response` struct in a major, breaking way.
 
 ## [1.4.0] - 2019-07-13
 ### Added

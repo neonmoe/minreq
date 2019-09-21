@@ -138,7 +138,13 @@ pub fn url(req: &str) -> String {
 
 pub fn get_body(request: Result<minreq::Response, Error>) -> String {
     match request {
-        Ok(response) => String::from(response.body),
+        Ok(response) => match response.as_str() {
+            Ok(str) => String::from(str),
+            Err(err) => {
+                println!("\n[ERROR]: {}\n", err);
+                String::new()
+            }
+        },
         Err(err) => {
             println!("\n[ERROR]: {}\n", err);
             String::new()

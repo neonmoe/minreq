@@ -146,6 +146,11 @@ where
     Ok(stream)
 }
 
+// TODO: Possibly strip out the 'read a byte' logic out, move the
+// header handling stuff to a function that constructs a
+// Result<Response>, and the rest in the Response's iterator. Perhaps
+// impl Iterator for Response?
+
 /// Reads the stream until it can't or it reaches the end of the HTTP
 /// response.
 fn read_from_stream<T: Read>(stream: T, head: bool) -> Result<Vec<u8>, Error> {
