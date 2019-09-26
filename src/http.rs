@@ -1,8 +1,7 @@
 use crate::connection::Connection;
-use crate::response::Response;
+use crate::{MinreqError, Response};
 use std::collections::HashMap;
 use std::fmt;
-use std::io::Error;
 
 /// A URL type for requests.
 pub type URL = String;
@@ -53,6 +52,7 @@ impl fmt::Display for Method {
 }
 
 /// An HTTP request.
+#[derive(Debug)]
 pub struct Request {
     pub(crate) method: Method,
     pub(crate) host: URL,
@@ -60,8 +60,9 @@ pub struct Request {
     headers: HashMap<String, String>,
     body: Option<String>,
     pub(crate) timeout: Option<u64>,
+    max_redirects: usize,
     https: bool,
-    pub(crate) redirects: Vec<URL>,
+    pub(crate) redirects: Vec<(bool, URL, URL)>,
     load_later: bool,
 }
 
@@ -71,7 +72,7 @@ impl Request {
     /// This is only the request's data, it is not sent yet. For
     /// sending the request, see [`send`](struct.Request.html#method.send).
     pub fn new<T: Into<URL>>(method: Method, url: T) -> Request {
-        let (host, resource, https) = parse_url(url.into());
+        let (https, host, resource) = parse_url(url.into());
         Request {
             method,
             host,
@@ -79,6 +80,7 @@ impl Request {
             headers: HashMap::new(),
             body: None,
             timeout: None,
+            max_redirects: 100,
             https,
             redirects: Vec::new(),
             load_later: false,
@@ -119,6 +121,18 @@ impl Request {
         self
     }
 
+    /// Sets the max redirects we follow until giving up. 100 by
+    /// default.
+    ///
+    /// Warning: setting this to a very high number, such as 1000, may
+    /// cause a stack overflow if that many redirects are followed. If
+    /// you have a use for so many redirects that the stack overflow
+    /// becomes a problem, please open an issue.
+    pub fn with_max_redirects(mut self, max_redirects: usize) -> Request {
+        self.max_redirects = max_redirects;
+        self
+    }
+
     /// Indicates that the response's body should be read by the
     /// caller through an iterator, instead of being loaded during
     /// [`send()`](#method.send).
@@ -151,7 +165,7 @@ impl Request {
 
     /// Sends this request to the host.
     #[cfg(not(feature = "https"))]
-    pub fn send(self) -> Result<Response, Error> {
+    pub fn send(self) -> Result<Response, MinreqError> {
         if self.https {
             panic!("Can't send requests to urls that start with https:// when the `https` feature is not enabled!")
         } else {
@@ -180,23 +194,28 @@ impl Request {
         http
     }
 
-    pub(crate) fn redirect_to(&mut self, url: URL) {
-        self.redirects
-            .push(create_url(&self.host, &self.resource, self.https));
+    /// Returns the redirected version of this Request, unless an infinite redirection loop was detected.
+    pub(crate) fn redirect_to(mut self, url: URL) -> Option<Request> {
+        self.redirects.push((self.https, self.host, self.resource));
 
-        let (host, resource, https) = parse_url(url);
+        let (https, host, resource) = parse_url(url);
         self.host = host;
         self.resource = resource;
         self.https = https;
+
+        if self.redirects.len() > self.max_redirects
+            || self.redirects.iter().any(|(https_, host_, resource_)| {
+                *resource_ == self.resource && *host_ == self.host && *https_ == https
+            })
+        {
+            None
+        } else {
+            Some(self)
+        }
     }
 }
 
-fn create_url(host: &str, resource: &str, https: bool) -> URL {
-    let prefix = if https { "https://" } else { "http://" };
-    return format!("{}{}{}", prefix, host, resource);
-}
-
-fn parse_url(url: URL) -> (URL, URL, bool) {
+fn parse_url(url: URL) -> (bool, URL, URL) {
     let mut first = URL::new();
     let mut second = URL::new();
     let mut slashes = 0;
@@ -219,62 +238,5 @@ fn parse_url(url: URL) -> (URL, URL, bool) {
     if !first.contains(':') {
         first += if https { ":443" } else { ":80" };
     }
-    (first, second, https)
-}
-
-pub(crate) fn parse_status_line(http_response: &[u8]) -> (i32, String) {
-    let (line, _) = split_at(http_response, "\r\n");
-    if let Ok(line) = std::str::from_utf8(line) {
-        let mut split = line.split(' ');
-        if let Some(code) = split.nth(1) {
-            if let Ok(code) = code.parse::<i32>() {
-                if let Some(reason) = split.next() {
-                    return (code, reason.to_string());
-                }
-            }
-        }
-    }
-    (503, "Server did not provide a status line".to_string())
-}
-
-pub(crate) fn parse_http_response_content(
-    http_response: &[u8],
-) -> (HashMap<String, String>, Vec<u8>) {
-    let (headers_text, body) = split_at(http_response, "\r\n\r\n");
-
-    let mut headers = HashMap::new();
-    let mut status_line = true;
-    if let Ok(headers_text) = std::str::from_utf8(headers_text) {
-        for line in headers_text.lines() {
-            if status_line {
-                status_line = false;
-                continue;
-            } else if let Some((key, value)) = parse_header(line) {
-                headers.insert(key, value);
-            }
-        }
-    }
-
-    (headers, body.to_vec())
-}
-
-fn split_at<'a>(bytes: &'a [u8], splitter: &str) -> (&'a [u8], &'a [u8]) {
-    for i in 0..bytes.len() - splitter.len() {
-        if let Ok(s) = std::str::from_utf8(&bytes[i..i + splitter.len()]) {
-            if s == splitter {
-                return (&bytes[..i], &bytes[i + splitter.len()..]);
-            }
-        }
-    }
-    (bytes, &[])
-}
-
-pub(crate) fn parse_header(line: &str) -> Option<(String, String)> {
-    if let Some(index) = line.find(':') {
-        let key = line[..index].trim().to_string();
-        let value = line[(index + 1)..].trim().to_string();
-        Some((key, value))
-    } else {
-        None
-    }
+    (https, first, second)
 }

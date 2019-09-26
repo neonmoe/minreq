@@ -41,27 +41,6 @@
 //! }
 //! ```
 //!
-//! ## Get, but read during the download
-//! ```no_run
-//! // This is an example similar to the Get example above, but
-//! // instead of downloading the whole response before printing it, this
-//! // prints the response during the download. This doesn't handle UTF-8
-//! // validity however, as it's printed char-by-char, instead of being
-//! // converted into an str (which must be valid UTF-8).
-//!
-//! use std::io::Write;
-//! if let Ok(mut response) = minreq::get("http://httpbin.org/ip")
-//!     .with_load_later(true)
-//!     .send()
-//! {
-//!     for byte in response.as_iter_mut().unwrap() {
-//!         // Print every byte `as` char, as the body is still being downloaded.
-//!         print!("{}", byte as char);
-//!         std::io::stdout().flush();
-//!     }
-//! }
-//! ```
-//!
 //! ## Body
 //! ```no_run
 //! // To include a body, add .with_body("") before .send().
@@ -133,10 +112,12 @@ extern crate webpki;
 extern crate webpki_roots;
 
 mod connection;
+mod error;
 mod http;
 mod requests;
 mod response;
 
+pub use error::*;
 pub use http::*;
 pub use requests::*;
 pub use response::*;
