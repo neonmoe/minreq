@@ -16,7 +16,13 @@ pub fn setup() {
             let server = server.clone();
 
             thread::spawn(move || loop {
-                let mut request = server.recv().unwrap();
+                let mut request = {
+                    if let Ok(request) = server.recv() {
+                        request
+                    } else {
+                        continue; // If .recv() fails, just try again.
+                    }
+                };
                 let mut content = String::new();
                 request.as_reader().read_to_string(&mut content).ok();
                 let headers = Vec::from(request.headers());
