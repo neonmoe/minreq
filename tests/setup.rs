@@ -1,6 +1,5 @@
 extern crate minreq;
 extern crate tiny_http;
-use self::minreq::MinreqError;
 use self::tiny_http::{Header, Method, Response, Server};
 use std::sync::Arc;
 use std::sync::{Once, ONCE_INIT};
@@ -142,7 +141,7 @@ pub fn url(req: &str) -> String {
     format!("http://localhost:35562{}", req)
 }
 
-pub fn get_body(request: Result<minreq::Response, MinreqError>) -> String {
+pub fn get_body(request: Result<minreq::Response, minreq::Error>) -> String {
     match request {
         Ok(response) => match response.as_str() {
             Ok(str) => String::from(str),
@@ -158,7 +157,7 @@ pub fn get_body(request: Result<minreq::Response, MinreqError>) -> String {
     }
 }
 
-pub fn get_status_code(request: Result<minreq::Response, MinreqError>) -> i32 {
+pub fn get_status_code(request: Result<minreq::Response, minreq::Error>) -> i32 {
     match request {
         Ok(response) => response.status_code,
         Err(err) => {

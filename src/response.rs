@@ -1,7 +1,75 @@
-use crate::MinreqError;
+use crate::Error;
 use std::collections::HashMap;
 use std::io::{Bytes, Read};
 use std::str;
+
+struct ResponseIter<T: Read> {
+    bytes: Bytes<T>,
+    chunked: bool,
+    chunks_done: bool,
+    expected_bytes: usize,
+}
+
+impl<T: Read> ResponseIter<T> {
+    fn new(bytes: Bytes<T>, chunked: bool, expected_bytes: usize) -> ResponseIter<T> {
+        ResponseIter {
+            bytes,
+            chunked,
+            chunks_done: false,
+            expected_bytes,
+        }
+    }
+}
+
+impl<T: Read> Iterator for ResponseIter<T> {
+    type Item = Result<u8, Error>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.chunked {
+            if self.chunks_done {
+                return None;
+            }
+
+            if self.expected_bytes == 0 {
+                // Read the end of the last chunk first, return error if encountered
+                if let Err(err) = read_line(&mut self.bytes) {
+                    return Some(Err(err));
+                }
+
+                // Get the size of the next chunk
+                let count_line = match read_line(&mut self.bytes) {
+                    Ok(line) => line,
+                    Err(err) => return Some(Err(err)),
+                };
+                match str::parse::<usize>(&count_line) {
+                    Ok(incoming_count) => {
+                        if incoming_count == 0 {
+                            self.chunks_done = true;
+                            return None;
+                        }
+                        self.expected_bytes = incoming_count;
+                    }
+                    Err(_) => return Some(Err(Error::MalformedChunkLength)),
+                }
+            }
+        }
+
+        // Read the next byte
+        if self.expected_bytes > 0 {
+            self.expected_bytes -= 1;
+
+            if let Some(byte) = self.bytes.next() {
+                return match byte {
+                    Ok(byte) => Some(Ok(byte)),
+                    Err(err) => Some(Err(Error::IoError(err))),
+                };
+            }
+        }
+
+        // Either we loaded all the bytes expected, or ran out of bytes
+        None
+    }
+}
 
 /// An HTTP response.
 #[derive(Debug, Clone)]
@@ -17,9 +85,8 @@ pub struct Response {
 }
 
 impl Response {
-    pub(crate) fn from_stream<T: Read>(stream: T, is_head: bool) -> Result<Response, MinreqError> {
-        let stream_ = stream;
-        let mut stream = stream_.bytes();
+    pub(crate) fn from_stream<T: Read>(stream: T, is_head: bool) -> Result<Response, Error> {
+        let mut stream = stream.bytes();
         let (status_code, reason_phrase) = parse_status_line(read_line(&mut stream)?);
         let mut headers = HashMap::new();
         let mut chunked = false;
@@ -42,7 +109,7 @@ impl Response {
                 if expected_size.is_none() && &header.0.to_lowercase() == "content-length" {
                     match str::parse::<usize>(&header.1.trim()) {
                         Ok(length) => expected_size = Some(length),
-                        Err(_) => return Err(MinreqError::MalformedContentLength),
+                        Err(_) => return Err(Error::MalformedContentLength),
                     }
                 }
                 headers.insert(header.0, header.1);
@@ -50,40 +117,20 @@ impl Response {
         }
 
         // Read body (if needed)
-        let ignore_body =
-            is_head || status_code / 100 == 1 || status_code == 204 || status_code == 304;
-        let body = if ignore_body {
+        let body = if is_head || status_code / 100 == 1 || status_code == 204 || status_code == 304
+        {
             Vec::new()
-        } else if chunked {
-            // Transfer-Encoding: chunked
-            let mut body = Vec::new();
-            loop {
-                match str::parse::<usize>(&read_line(&mut stream)?) {
-                    Ok(incoming_count) => {
-                        if incoming_count == 0 {
-                            break;
-                        }
-                        body.reserve(incoming_count);
-                        for byte in &mut stream {
-                            if let Ok(byte) = byte {
-                                body.push(byte);
-                            }
-                        }
-                    }
-                    Err(_) => return Err(MinreqError::MalformedChunkLength),
+        } else {
+            let count = expected_size.unwrap_or(0);
+            let iter = ResponseIter::new(stream, chunked, count);
+            let mut collected = Vec::with_capacity(count);
+            for byte in iter {
+                match byte {
+                    Ok(byte) => collected.push(byte),
+                    Err(err) => return Err(err),
                 }
             }
-            body
-        } else if let Some(content_length) = expected_size {
-            stream.take(content_length).filter_map(|b| b.ok()).collect()
-        } else {
-            // NOTE: Maybe this should return an error? The HTTP
-            // standard says that it is valid to assume that a message
-            // ends after the server closes the connection, but that
-            // Content-Length should be respected over that: so if
-            // there is no Content-Length, maybe falling back on
-            // waiting for the server to close the connection is fine?
-            stream.filter_map(|b| b.ok()).collect()
+            collected
         };
 
         Ok(Response {
@@ -140,15 +187,22 @@ impl Response {
     /// # }
     /// ```
     #[cfg(feature = "json-using-serde")]
-    pub fn json<'a, T>(&'a self) -> Result<T, serde_json::Error>
+    pub fn json<'a, T>(&'a self) -> Result<T, Error>
     where
         T: serde::de::Deserialize<'a>,
     {
-        serde_json::from_str(&self.body)
+        let str = match self.as_str() {
+            Ok(str) => str,
+            Err(_) => return Err(Error::InvalidUtf8InResponse),
+        };
+        match serde_json::from_str(str) {
+            Ok(json) => Ok(json),
+            Err(err) => Err(Error::SerdeJsonError(err)),
+        }
     }
 }
 
-fn read_line<T: Read>(stream: &mut Bytes<T>) -> Result<String, MinreqError> {
+fn read_line<T: Read>(stream: &mut Bytes<T>) -> Result<String, Error> {
     let mut bytes = Vec::with_capacity(32);
     for byte in stream {
         match byte {
@@ -162,13 +216,13 @@ fn read_line<T: Read>(stream: &mut Bytes<T>) -> Result<String, MinreqError> {
                 }
             }
             Err(err) => {
-                return Err(MinreqError::IOError(err));
+                return Err(Error::IoError(err));
             }
         }
     }
     match String::from_utf8(bytes) {
         Ok(line) => Ok(line.to_string()),
-        Err(_) => Err(MinreqError::InvalidUtf8InResponse),
+        Err(_) => Err(Error::InvalidUtf8InResponse),
     }
 }
 

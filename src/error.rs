@@ -4,9 +4,9 @@ use std::io;
 
 /// Represents an error while receiving or parsing an HTTP response.
 #[derive(Debug)]
-pub enum MinreqError {
+pub enum Error {
     /// Ran into an IO problem while loading the response.
-    IOError(io::Error),
+    IoError(io::Error),
     /// Couldn't parse the incoming chunk's length while receiving a
     /// response with the header `Transfer-Encoding: chunked`.
     MalformedChunkLength,
@@ -28,28 +28,37 @@ pub enum MinreqError {
     /// please open an issue, and include the string inside this
     /// error, as it can be used to locate the problem.
     Other(&'static str),
+
+    #[cfg(feature = "json-using-serde")]
+    /// Ran into a serde error.
+    SerdeJsonError(serde_json::Error),
 }
 
-impl fmt::Display for MinreqError {
+impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use MinreqError::*;
+        use Error::*;
         match self {
-            IOError(err) => write!(f, "{}", err),
+            IoError(err) => write!(f, "{}", err),
             MalformedChunkLength => write!(f, "non-usize chunk length with transfer-encoding: chunked"),
             MalformedContentLength => write!(f, "non-usize content length"),
             RedirectLocationMissing => write!(f, "redirection location header missing"),
             InfiniteRedirectionLoop => write!(f, "infinite redirection loop detected"),
             InvalidUtf8InResponse => write!(f, "response contained invalid utf-8 where valid utf-8 was expected"),
             Other(msg) => write!(f, "error in minreq: please open an issue in the minreq repo, include the following: '{}'", msg),
+
+            #[cfg(feature = "json-using-serde")]
+            SerdeJsonError(err) => write!(f, "{}", err),
         }
     }
 }
 
-impl error::Error for MinreqError {
+impl error::Error for Error {
     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
-        use MinreqError::*;
+        use Error::*;
         match self {
-            IOError(err) => Some(err),
+            IoError(err) => Some(err),
+            #[cfg(feature = "json-using-serde")]
+            SerdeJsonError(err) => Some(err),
             _ => None,
         }
     }

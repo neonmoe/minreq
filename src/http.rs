@@ -1,5 +1,5 @@
 use crate::connection::Connection;
-use crate::{MinreqError, Response};
+use crate::{Error, Response};
 use std::collections::HashMap;
 use std::fmt;
 
@@ -165,7 +165,7 @@ impl Request {
 
     /// Sends this request to the host.
     #[cfg(not(feature = "https"))]
-    pub fn send(self) -> Result<Response, MinreqError> {
+    pub fn send(self) -> Result<Response, Error> {
         if self.https {
             panic!("Can't send requests to urls that start with https:// when the `https` feature is not enabled!")
         } else {

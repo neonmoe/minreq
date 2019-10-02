@@ -1,4 +1,4 @@
-use crate::{http, MinreqError, Request, Response};
+use crate::{http, Error, Request, Response};
 #[cfg(feature = "https")]
 use rustls::{self, ClientConfig, ClientSession};
 use std::env;
@@ -70,28 +70,28 @@ impl Connection {
 
     /// Sends the [`Request`](struct.Request.html), consumes this
     /// connection, and returns a [`Response`](struct.Response.html).
-    pub(crate) fn send(self) -> Result<Response, MinreqError> {
+    pub(crate) fn send(self) -> Result<Response, Error> {
         let is_head = self.request.method == http::Method::Head;
         let bytes = self.request.to_string().into_bytes();
 
         let tcp = match create_tcp_stream(&self.request.host, self.timeout) {
             Ok(stream) => stream,
             Err(err) => {
-                return Err(MinreqError::IOError(err));
+                return Err(Error::IoError(err));
             }
         };
 
         // Send request
         let mut stream = BufWriter::new(tcp);
         if let Err(err) = stream.write_all(&bytes) {
-            return Err(MinreqError::IOError(err));
+            return Err(Error::IoError(err));
         }
 
         // Receive response
         let tcp = match stream.into_inner() {
             Ok(stream) => stream,
             Err(_) => {
-                return Err(MinreqError::Other(
+                return Err(Error::Other(
                     "IntoInnerError after writing the request into the TcpStream.",
                 ));
             }
@@ -104,13 +104,13 @@ impl Connection {
     }
 }
 
-fn handle_redirects(connection: Connection, response: Response) -> Result<Response, MinreqError> {
+fn handle_redirects(connection: Connection, response: Response) -> Result<Response, Error> {
     let status_code = response.status_code;
     match status_code {
         301 | 302 | 303 | 307 => {
             let url = response.headers.get("Location");
             if url.is_none() {
-                return Err(MinreqError::RedirectLocationMissing);
+                return Err(Error::RedirectLocationMissing);
             }
             let url = url.unwrap();
 
@@ -126,7 +126,7 @@ fn handle_redirects(connection: Connection, response: Response) -> Result<Respon
 
                 request.send()
             } else {
-                Err(MinreqError::InfiniteRedirectionLoop)
+                Err(Error::InfiniteRedirectionLoop)
             }
         }
 
