@@ -65,8 +65,11 @@ impl Response {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn as_str(&self) -> Result<&str, str::Utf8Error> {
-        str::from_utf8(&self.body)
+    pub fn as_str(&self) -> Result<&str, Error> {
+        match str::from_utf8(&self.body) {
+            Ok(s) => Ok(s),
+            Err(_) => Err(Error::InvalidUtf8InBody),
+        }
     }
 
     /// Converts JSON body to a `struct` using Serde.
@@ -211,19 +214,15 @@ impl<T: Read> Iterator for ResponseIter<T> {
             }
 
             if self.expected_bytes == 0 {
-                // Read the end of the last chunk first, return error if encountered
-                if let Err(err) = read_line(&mut self.bytes) {
-                    return Some(Err(err));
-                }
-
                 // Get the size of the next chunk
                 let count_line = match read_line(&mut self.bytes) {
                     Ok(line) => line,
                     Err(err) => return Some(Err(err)),
                 };
-                match str::parse::<usize>(&count_line) {
+                match usize::from_str_radix(&count_line, 16) {
                     Ok(incoming_count) => {
                         if incoming_count == 0 {
+                            // FIXME: Trailer header handling
                             self.chunks_done = true;
                             return None;
                         }
@@ -240,7 +239,20 @@ impl<T: Read> Iterator for ResponseIter<T> {
 
             if let Some(byte) = self.bytes.next() {
                 return match byte {
-                    Ok(byte) => Some(Ok((byte, self.expected_bytes + 1))),
+                    Ok(byte) => {
+                        if self.chunked && self.expected_bytes == 0 {
+                            // The last byte of the chunk was read, pop the trailing \r\n
+                            match read_line(&mut self.bytes) {
+                                Err(err) => return Some(Err(err)),
+
+                                // FIXME: Remove this after testing
+                                // that normal, spec-conforming
+                                // chunked transfers work
+                                Ok(s) => debug_assert!(s.len() == 0),
+                            }
+                        }
+                        Some(Ok((byte, self.expected_bytes + 1)))
+                    }
                     Err(err) => Some(Err(Error::IoError(err))),
                 };
             }
@@ -278,12 +290,12 @@ fn read_metadata<T: Read>(stream: &mut Bytes<T>) -> Result<ResponseMetadata, Err
         }
         if let Some(header) = parse_header(line) {
             if !chunked
-                && &header.0.to_lowercase() == "transfer-encoding"
-                && &header.1.to_lowercase() == "chunked"
+                && header.0.to_lowercase().trim() == "transfer-encoding"
+                && header.1.to_lowercase().trim() == "chunked"
             {
                 chunked = true;
             }
-            if content_length.is_none() && &header.0.to_lowercase() == "content-length" {
+            if content_length.is_none() && header.0.to_lowercase().trim() == "content-length" {
                 match str::parse::<usize>(&header.1.trim()) {
                     Ok(length) => content_length = Some(length),
                     Err(_) => return Err(Error::MalformedContentLength),
@@ -340,7 +352,7 @@ fn parse_status_line(line: String) -> (i32, String) {
 
 fn parse_header(mut line: String) -> Option<(String, String)> {
     if let Some(location) = line.find(':') {
-        let value = line.split_off(location + 1);
+        let value = line.split_off(location + 2);
         line.truncate(location);
         return Some((line, value));
     }

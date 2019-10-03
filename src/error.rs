@@ -25,6 +25,10 @@ pub enum Error {
     /// The response contained invalid UTF-8 where it should be valid
     /// (eg. headers).
     InvalidUtf8InResponse,
+    /// The response body contains invalid UTF-8, so the `as_str()`
+    /// conversion failed.
+    // FIXME: Add the inner Utf8Error here?
+    InvalidUtf8InBody,
 
     /// This is a special error case, one that should never be
     /// returned! Think of this as a cleaner alternative to calling
@@ -44,6 +48,7 @@ impl fmt::Display for Error {
             RedirectLocationMissing => write!(f, "redirection location header missing"),
             InfiniteRedirectionLoop => write!(f, "infinite redirection loop detected"),
             InvalidUtf8InResponse => write!(f, "response contained invalid utf-8 where valid utf-8 was expected"),
+            InvalidUtf8InBody => write!(f, "response body contains invalid utf-8, so it can't be converted into a string"),
             Other(msg) => write!(f, "error in minreq: please open an issue in the minreq repo, include the following: '{}'", msg),
 
             #[cfg(feature = "json-using-serde")]
