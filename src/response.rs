@@ -170,7 +170,11 @@ impl<T: Read> ResponseLazy<T> {
             reason_phrase,
             headers,
             content_length,
-            iter: ResponseIter::new(stream, chunked, content_length.unwrap_or(0)),
+            iter: ResponseIter::new(
+                stream,
+                chunked,
+                if chunked { Some(0) } else { content_length },
+            ),
         })
     }
 }
@@ -187,16 +191,16 @@ struct ResponseIter<T: Read> {
     bytes: Bytes<T>,
     chunked: bool,
     chunks_done: bool,
-    expected_bytes: usize,
+    content_length: Option<usize>,
 }
 
 impl<T: Read> ResponseIter<T> {
-    fn new(bytes: Bytes<T>, chunked: bool, expected_bytes: usize) -> ResponseIter<T> {
+    fn new(bytes: Bytes<T>, chunked: bool, content_length: Option<usize>) -> ResponseIter<T> {
         ResponseIter {
             bytes,
             chunked,
             chunks_done: false,
-            expected_bytes,
+            content_length,
         }
     }
 }
@@ -213,52 +217,64 @@ impl<T: Read> Iterator for ResponseIter<T> {
                 return None;
             }
 
-            if self.expected_bytes == 0 {
-                // Get the size of the next chunk
-                let count_line = match read_line(&mut self.bytes) {
-                    Ok(line) => line,
-                    Err(err) => return Some(Err(err)),
-                };
-                match usize::from_str_radix(&count_line, 16) {
-                    Ok(incoming_count) => {
-                        if incoming_count == 0 {
-                            // FIXME: Trailer header handling
-                            self.chunks_done = true;
-                            return None;
+            if let Some(content_length) = self.content_length {
+                if content_length == 0 {
+                    // Get the size of the next chunk
+                    let count_line = match read_line(&mut self.bytes) {
+                        Ok(line) => line,
+                        Err(err) => return Some(Err(err)),
+                    };
+                    match usize::from_str_radix(&count_line, 16) {
+                        Ok(incoming_count) => {
+                            if incoming_count == 0 {
+                                // FIXME: Trailer header handling
+                                self.chunks_done = true;
+                                return None;
+                            }
+                            self.content_length = Some(incoming_count);
                         }
-                        self.expected_bytes = incoming_count;
+                        Err(_) => return Some(Err(Error::MalformedChunkLength)),
                     }
-                    Err(_) => return Some(Err(Error::MalformedChunkLength)),
+                }
+            } else {
+                return Some(Err(Error::Other(
+                    "content length was None in a chunked transfer",
+                )));
+            }
+        }
+
+        if let Some(content_length) = self.content_length {
+            if content_length > 0 {
+                self.content_length = Some(content_length - 1);
+
+                if let Some(byte) = self.bytes.next() {
+                    match byte {
+                        Ok(byte) => {
+                            if self.chunked && content_length - 1 == 0 {
+                                // The last byte of the chunk was read, pop the trailing \r\n
+                                if let Err(err) = read_line(&mut self.bytes) {
+                                    return Some(Err(err));
+                                }
+                            }
+                            return Some(Ok((byte, content_length)));
+                        }
+                        Err(err) => return Some(Err(Error::IoError(err))),
+                    }
+                }
+            }
+        } else {
+            // TODO: Check if this behaviour matches the HTTP spec
+
+            // Content-Length wasn't specified, and this is not a
+            // chunked transfer. So just keep getting the bytes until
+            // the connection ends, I guess?
+            if let Some(byte) = self.bytes.next() {
+                match byte {
+                    Ok(byte) => return Some(Ok((byte, 1))),
+                    Err(err) => return Some(Err(Error::IoError(err))),
                 }
             }
         }
-
-        // Read the next byte
-        if self.expected_bytes > 0 {
-            self.expected_bytes -= 1;
-
-            if let Some(byte) = self.bytes.next() {
-                return match byte {
-                    Ok(byte) => {
-                        if self.chunked && self.expected_bytes == 0 {
-                            // The last byte of the chunk was read, pop the trailing \r\n
-                            match read_line(&mut self.bytes) {
-                                Err(err) => return Some(Err(err)),
-
-                                // FIXME: Remove this after testing
-                                // that normal, spec-conforming
-                                // chunked transfers work
-                                Ok(s) => debug_assert!(s.len() == 0),
-                            }
-                        }
-                        Some(Ok((byte, self.expected_bytes + 1)))
-                    }
-                    Err(err) => Some(Err(Error::IoError(err))),
-                };
-            }
-        }
-
-        // Either we loaded all the bytes expected, or ran out of bytes
         None
     }
 }
