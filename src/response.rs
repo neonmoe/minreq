@@ -22,7 +22,10 @@ impl<T: Read> ResponseIter<T> {
 }
 
 impl<T: Read> Iterator for ResponseIter<T> {
-    type Item = Result<u8, Error>;
+    // u8 is the byte that was read, usize is how much you should
+    // reserve in a Vec if you're pushing the bytes into it for
+    // optimal operation.
+    type Item = Result<(u8, usize), Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.chunked {
@@ -60,7 +63,7 @@ impl<T: Read> Iterator for ResponseIter<T> {
 
             if let Some(byte) = self.bytes.next() {
                 return match byte {
-                    Ok(byte) => Some(Ok(byte)),
+                    Ok(byte) => Some(Ok((byte, self.expected_bytes + 1))),
                     Err(err) => Some(Err(Error::IoError(err))),
                 };
             }
@@ -69,6 +72,57 @@ impl<T: Read> Iterator for ResponseIter<T> {
         // Either we loaded all the bytes expected, or ran out of bytes
         None
     }
+}
+
+// This struct is just used in the Response and ResponseLazy
+// constructors, but not in their structs, for api-cleanliness
+// reasons. (Eg. response.status_code is much cleaner than
+// response.meta.status_code or similar.)
+struct ResponseMetadata {
+    status_code: i32,
+    reason_phrase: String,
+    headers: HashMap<String, String>,
+    chunked: bool,
+    content_length: Option<usize>,
+}
+
+fn read_metadata<T: Read>(stream: &mut Bytes<T>) -> Result<ResponseMetadata, Error> {
+    let (status_code, reason_phrase) = parse_status_line(read_line(stream)?);
+    let mut headers = HashMap::new();
+    let mut chunked = false;
+    let mut content_length = None;
+
+    // Read headers
+    loop {
+        let line = read_line(stream)?;
+        if line.len() == 0 {
+            // Body starts here
+            break;
+        }
+        if let Some(header) = parse_header(line) {
+            if !chunked
+                && &header.0.to_lowercase() == "transfer-encoding"
+                && &header.1.to_lowercase() == "chunked"
+            {
+                chunked = true;
+            }
+            if content_length.is_none() && &header.0.to_lowercase() == "content-length" {
+                match str::parse::<usize>(&header.1.trim()) {
+                    Ok(length) => content_length = Some(length),
+                    Err(_) => return Err(Error::MalformedContentLength),
+                }
+            }
+            headers.insert(header.0, header.1);
+        }
+    }
+
+    Ok(ResponseMetadata {
+        status_code,
+        reason_phrase,
+        headers,
+        chunked,
+        content_length,
+    })
 }
 
 /// An HTTP response.
@@ -87,46 +141,29 @@ pub struct Response {
 impl Response {
     pub(crate) fn from_stream<T: Read>(stream: T, is_head: bool) -> Result<Response, Error> {
         let mut stream = stream.bytes();
-        let (status_code, reason_phrase) = parse_status_line(read_line(&mut stream)?);
-        let mut headers = HashMap::new();
-        let mut chunked = false;
-        let mut expected_size = None;
-
-        // Read headers
-        loop {
-            let line = read_line(&mut stream)?;
-            if line.len() == 0 {
-                // Body starts here
-                break;
-            }
-            if let Some(header) = parse_header(line) {
-                if !chunked
-                    && &header.0.to_lowercase() == "transfer-encoding"
-                    && &header.1.to_lowercase() == "chunked"
-                {
-                    chunked = true;
-                }
-                if expected_size.is_none() && &header.0.to_lowercase() == "content-length" {
-                    match str::parse::<usize>(&header.1.trim()) {
-                        Ok(length) => expected_size = Some(length),
-                        Err(_) => return Err(Error::MalformedContentLength),
-                    }
-                }
-                headers.insert(header.0, header.1);
-            }
-        }
+        let ResponseMetadata {
+            status_code,
+            reason_phrase,
+            headers,
+            chunked,
+            content_length,
+        } = read_metadata(&mut stream)?;
 
         // Read body (if needed)
-        let body = if is_head || status_code / 100 == 1 || status_code == 204 || status_code == 304
-        {
+        let bodyless_status = status_code / 100 == 1 || status_code == 204 || status_code == 304;
+        let body = if is_head || bodyless_status {
+            // No body!
             Vec::new()
         } else {
-            let count = expected_size.unwrap_or(0);
+            let count = content_length.unwrap_or(0);
             let iter = ResponseIter::new(stream, chunked, count);
             let mut collected = Vec::with_capacity(count);
             for byte in iter {
                 match byte {
-                    Ok(byte) => collected.push(byte),
+                    Ok((byte, length)) => {
+                        collected.reserve(length);
+                        collected.push(byte)
+                    }
                     Err(err) => return Err(err),
                 }
             }
