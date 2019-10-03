@@ -1,4 +1,4 @@
-use crate::{http, Error, Request, Response};
+use crate::{http, Error, Request, ResponseLazy};
 #[cfg(feature = "https")]
 use rustls::{self, ClientConfig, ClientSession};
 use std::env;
@@ -70,8 +70,7 @@ impl Connection {
 
     /// Sends the [`Request`](struct.Request.html), consumes this
     /// connection, and returns a [`Response`](struct.Response.html).
-    pub(crate) fn send(self) -> Result<Response, Error> {
-        let is_head = self.request.method == http::Method::Head;
+    pub(crate) fn send(self) -> Result<ResponseLazy<BufReader<TcpStream>>, Error> {
         let bytes = self.request.to_string().into_bytes();
 
         let tcp = match create_tcp_stream(&self.request.host, self.timeout) {
@@ -97,14 +96,15 @@ impl Connection {
             }
         };
         let stream = BufReader::new(tcp);
-        match Response::from_stream(stream, is_head) {
-            Ok(response) => handle_redirects(self, response),
-            Err(err) => Err(err),
-        }
+        let response = ResponseLazy::from_stream(stream)?;
+        handle_redirects(self, response)
     }
 }
 
-fn handle_redirects(connection: Connection, response: Response) -> Result<Response, Error> {
+fn handle_redirects(
+    connection: Connection,
+    response: ResponseLazy<BufReader<TcpStream>>,
+) -> Result<ResponseLazy<BufReader<TcpStream>>, Error> {
     let status_code = response.status_code;
     match status_code {
         301 | 302 | 303 | 307 => {
@@ -124,7 +124,7 @@ fn handle_redirects(connection: Connection, response: Response) -> Result<Respon
                     }
                 }
 
-                request.send()
+                request.send_lazy()
             } else {
                 Err(Error::InfiniteRedirectionLoop)
             }

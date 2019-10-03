@@ -23,8 +23,9 @@
 //!
 //! ## `json-using-serde`
 //!
-//! This feature allows both serialize and deserialize JSON payload using
-//! [`serde_json`](https://crates.io/crates/serde_json) crate.
+//! This feature allows both serialize and deserialize JSON payload
+//! using the [`serde_json`](https://crates.io/crates/serde_json)
+//! crate.
 //!
 //! `Request` and `Response` expose `with_json()` and `json()` respectively
 //! for converting struct to JSON and back.

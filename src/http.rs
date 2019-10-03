@@ -1,5 +1,5 @@
 use crate::connection::Connection;
-use crate::{Error, Response};
+use crate::{Error, Response, ResponseLazy};
 use std::collections::HashMap;
 use std::fmt;
 
@@ -63,7 +63,6 @@ pub struct Request {
     max_redirects: usize,
     https: bool,
     pub(crate) redirects: Vec<(bool, URL, URL)>,
-    load_later: bool,
 }
 
 impl Request {
@@ -83,7 +82,6 @@ impl Request {
             max_redirects: 100,
             https,
             redirects: Vec::new(),
-            load_later: false,
         }
     }
 
@@ -104,15 +102,15 @@ impl Request {
 
     /// Converts given argument to JSON and sets it as body.
     #[cfg(feature = "json-using-serde")]
-    pub fn with_json<T: serde::ser::Serialize>(
-        mut self,
-        body: &T,
-    ) -> Result<Request, serde_json::Error> {
+    pub fn with_json<T: serde::ser::Serialize>(mut self, body: &T) -> Result<Request, Error> {
         self.headers.insert(
             "Content-Type".to_string(),
             "application/json; charset=UTF-8".to_string(),
         );
-        Ok(self.with_body(serde_json::to_string(&body)?))
+        match serde_json::to_string(&body) {
+            Ok(json) => Ok(self.with_body(json)),
+            Err(err) => Err(Error::SerdeJsonError(err)),
+        }
     }
 
     /// Sets the request timeout.
@@ -133,26 +131,6 @@ impl Request {
         self
     }
 
-    /// Indicates that the response's body should be read by the
-    /// caller through an iterator, instead of being loaded during
-    /// [`send()`](#method.send).
-    ///
-    /// This means that when the request is made, the response's
-    /// headers are read, and reading the body is left to you, via
-    /// iterating through
-    /// [`Response::as_iter_mut()`](struct.Response.html#method.as_iter_mut).
-    ///
-    /// When using this option, you should be wary of using
-    /// [`Response::as_str()`](struct.Response.html#method.as_str) and
-    /// [`Response::as_bytes()`](struct.Response.html#method.as_bytes),
-    /// as they return what they return based on which bytes have been
-    /// iterated through at the poitn of calling them, ie. probably
-    /// not the whole body.
-    pub fn with_load_later(mut self, load_later: bool) -> Request {
-        self.load_later = load_later;
-        self
-    }
-
     /// Sends this request to the host.
     #[cfg(feature = "https")]
     pub fn send(self) -> Result<Response, Error> {
@@ -166,6 +144,18 @@ impl Request {
     /// Sends this request to the host.
     #[cfg(not(feature = "https"))]
     pub fn send(self) -> Result<Response, Error> {
+        if self.https {
+            panic!("Can't send requests to urls that start with https:// when the `https` feature is not enabled!")
+        } else {
+            let is_head = self.method == Method::Head;
+            let response = Connection::new(self).send()?;
+            Response::create(response, is_head)
+        }
+    }
+
+    /// Sends this request to the host.
+    #[cfg(not(feature = "https"))]
+    pub fn send_lazy(self) -> Result<ResponseLazy<std::io::BufReader<std::net::TcpStream>>, Error> {
         if self.https {
             panic!("Can't send requests to urls that start with https:// when the `https` feature is not enabled!")
         } else {

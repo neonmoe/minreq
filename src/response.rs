@@ -3,6 +3,183 @@ use std::collections::HashMap;
 use std::io::{Bytes, Read};
 use std::str;
 
+/// An HTTP response.
+#[derive(Debug, Clone)]
+pub struct Response {
+    /// The status code of the response, eg. 404.
+    pub status_code: i32,
+    /// The reason phrase of the response, eg. "Not Found".
+    pub reason_phrase: String,
+    /// The headers of the response.
+    pub headers: HashMap<String, String>,
+    /// The body of the response.
+    pub body: Vec<u8>,
+}
+
+impl Response {
+    pub(crate) fn create<T: Read>(
+        parent: ResponseLazy<T>,
+        is_head: bool,
+    ) -> Result<Response, Error> {
+        let ResponseLazy {
+            status_code,
+            reason_phrase,
+            headers,
+            iter,
+            ..
+        } = parent;
+
+        let mut body = Vec::new();
+        if !is_head {
+            for byte in iter {
+                let (byte, length) = byte?;
+                body.reserve(length);
+                body.push(byte);
+            }
+        }
+
+        Ok(Response {
+            status_code,
+            reason_phrase,
+            headers,
+            body,
+        })
+    }
+
+    /// Returns a `&str` constructed from the body of the
+    /// `Response`. Shorthand for
+    /// `std::str::from_utf8(&response.body)`.
+    ///
+    /// Returns a `Result`, as it is possible that the returned bytes
+    /// are not valid UTF-8: the message can be corrupted on the
+    /// server's side, it could be still loading (`flush()` not yet
+    /// called, for example), or the returned message could simply not
+    /// be valid UTF-8.
+    ///
+    /// Usage:
+    /// ```no_run
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let url = "http://example.org/";
+    /// let response = minreq::get(url).send()?;
+    /// println!("{}", response.as_str()?);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn as_str(&self) -> Result<&str, str::Utf8Error> {
+        str::from_utf8(&self.body)
+    }
+
+    /// Converts JSON body to a `struct` using Serde.
+    ///
+    /// In case compiler cannot figure out return type you might need to declare it explicitly:
+    ///
+    /// ```no_run
+    /// use serde_derive::Deserialize;
+    ///
+    /// #[derive(Deserialize)]
+    /// struct User {
+    ///     name: String,
+    ///     email: String,
+    /// }
+    ///
+    /// # fn main() {
+    /// # let url_to_json_resource = "http://example.org/resource.json";
+    /// let user_name = minreq::get(url_to_json_resource)
+    ///     .send().unwrap()
+    ///     .json::<User>().unwrap() // explicitly declared type `User`
+    ///     .name;
+    /// println!("User name is '{}'", &user_name);
+    /// # }
+    /// ```
+    #[cfg(feature = "json-using-serde")]
+    pub fn json<'a, T>(&'a self) -> Result<T, Error>
+    where
+        T: serde::de::Deserialize<'a>,
+    {
+        let str = match self.as_str() {
+            Ok(str) => str,
+            Err(_) => return Err(Error::InvalidUtf8InResponse),
+        };
+        match serde_json::from_str(str) {
+            Ok(json) => Ok(json),
+            Err(err) => Err(Error::SerdeJsonError(err)),
+        }
+    }
+}
+
+/// An HTTP response, which is loaded lazily.
+///
+/// In practice, this means that the bytes are only loaded as you
+/// iterate through them. The bytes are provided in the form of a
+/// `Result<(u8, usize), minreq::Error>`, as the reading operation can
+/// fail in various ways. The `u8` is the actual byte that was read,
+/// and `usize` is how many bytes we are expecting to read in the
+/// future (including this byte). Note, however, that the `usize` can
+/// change, particularly when the `Transfer-Encoding` is `chunked`:
+/// then it will reflect how many bytes are left of the current chunk.
+///
+/// # Example
+/// ```no_run
+/// // This is pretty much how the normal Response works,
+/// // implemented with a ResponseLazy.
+/// # fn main() -> Result<(), minreq::Error> {
+/// if let Ok(response) = minreq::get("http://httpbin.org/ip").send_lazy() {
+///     let mut vec = Vec::new();
+///     for result in response {
+///         let (byte, length) = result?;
+///         vec.reserve(length);
+///         vec.push(byte);
+///     }
+/// }
+/// # Ok(())
+/// # }
+///
+/// ```
+pub struct ResponseLazy<T: Read> {
+    /// The status code of the response, eg. 404.
+    pub status_code: i32,
+    /// The reason phrase of the response, eg. "Not Found".
+    pub reason_phrase: String,
+    /// The headers of the response.
+    pub headers: HashMap<String, String>,
+    /// The expected content length, if known.
+    ///
+    /// This is just for convenience, sourced from the Content-Length
+    /// header.
+    pub content_length: Option<usize>,
+
+    iter: ResponseIter<T>,
+}
+
+impl<T: Read> ResponseLazy<T> {
+    pub(crate) fn from_stream(stream: T) -> Result<ResponseLazy<T>, Error> {
+        let mut stream = stream.bytes();
+        let ResponseMetadata {
+            status_code,
+            reason_phrase,
+            headers,
+            chunked,
+            content_length,
+        } = read_metadata(&mut stream)?;
+
+        Ok(ResponseLazy {
+            status_code,
+            reason_phrase,
+            headers,
+            content_length,
+            iter: ResponseIter::new(stream, chunked, content_length.unwrap_or(0)),
+        })
+    }
+}
+
+impl<T: Read> Iterator for ResponseLazy<T> {
+    type Item = Result<(u8, usize), Error>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter.next()
+    }
+}
+
 struct ResponseIter<T: Read> {
     bytes: Bytes<T>,
     chunked: bool,
@@ -123,120 +300,6 @@ fn read_metadata<T: Read>(stream: &mut Bytes<T>) -> Result<ResponseMetadata, Err
         chunked,
         content_length,
     })
-}
-
-/// An HTTP response.
-#[derive(Debug, Clone)]
-pub struct Response {
-    /// The status code of the response, eg. 404.
-    pub status_code: i32,
-    /// The reason phrase of the response, eg. "Not Found".
-    pub reason_phrase: String,
-    /// The headers of the response.
-    pub headers: HashMap<String, String>,
-    /// The body of the response.
-    pub body: Vec<u8>,
-}
-
-impl Response {
-    pub(crate) fn from_stream<T: Read>(stream: T, is_head: bool) -> Result<Response, Error> {
-        let mut stream = stream.bytes();
-        let ResponseMetadata {
-            status_code,
-            reason_phrase,
-            headers,
-            chunked,
-            content_length,
-        } = read_metadata(&mut stream)?;
-
-        // Read body (if needed)
-        let bodyless_status = status_code / 100 == 1 || status_code == 204 || status_code == 304;
-        let body = if is_head || bodyless_status {
-            // No body!
-            Vec::new()
-        } else {
-            let count = content_length.unwrap_or(0);
-            let iter = ResponseIter::new(stream, chunked, count);
-            let mut collected = Vec::with_capacity(count);
-            for byte in iter {
-                match byte {
-                    Ok((byte, length)) => {
-                        collected.reserve(length);
-                        collected.push(byte)
-                    }
-                    Err(err) => return Err(err),
-                }
-            }
-            collected
-        };
-
-        Ok(Response {
-            status_code,
-            reason_phrase,
-            headers,
-            body,
-        })
-    }
-
-    /// Returns a `&str` constructed from the body of the
-    /// `Response`. Shorthand for
-    /// `std::str::from_utf8(&response.body)`.
-    ///
-    /// Returns a `Result`, as it is possible that the returned bytes
-    /// are not valid UTF-8: the message can be corrupted on the
-    /// server's side, it could be still loading (`flush()` not yet
-    /// called, for example), or the returned message could simply not
-    /// be valid UTF-8.
-    ///
-    /// Usage:
-    /// ```no_run
-    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # let url = "http://example.org/";
-    /// let response = minreq::get(url).send()?;
-    /// println!("{}", response.as_str()?);
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn as_str(&self) -> Result<&str, str::Utf8Error> {
-        str::from_utf8(&self.body)
-    }
-
-    /// Converts JSON body to a `struct` using Serde.
-    ///
-    /// In case compiler cannot figure out return type you might need to declare it explicitly:
-    ///
-    /// ```no_run
-    /// use serde_derive::Deserialize;
-    ///
-    /// #[derive(Deserialize)]
-    /// struct User {
-    ///     name: String,
-    ///     email: String,
-    /// }
-    ///
-    /// # fn main() {
-    /// # let url_to_json_resource = "http://example.org/resource.json";
-    /// let user_name = minreq::get(url_to_json_resource)
-    ///     .send().unwrap()
-    ///     .json::<User>().unwrap() // explicitly declared type `User`
-    ///     .name;
-    /// println!("User name is '{}'", &user_name);
-    /// # }
-    /// ```
-    #[cfg(feature = "json-using-serde")]
-    pub fn json<'a, T>(&'a self) -> Result<T, Error>
-    where
-        T: serde::de::Deserialize<'a>,
-    {
-        let str = match self.as_str() {
-            Ok(str) => str,
-            Err(_) => return Err(Error::InvalidUtf8InResponse),
-        };
-        match serde_json::from_str(str) {
-            Ok(json) => Ok(json),
-            Err(err) => Err(Error::SerdeJsonError(err)),
-        }
-    }
 }
 
 fn read_line<T: Read>(stream: &mut Bytes<T>) -> Result<String, Error> {

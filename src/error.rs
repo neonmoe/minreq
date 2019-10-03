@@ -2,9 +2,13 @@ use std::error;
 use std::fmt;
 use std::io;
 
-/// Represents an error while receiving or parsing an HTTP response.
+/// Represents an error while sending, receiving, or parsing an HTTP response.
 #[derive(Debug)]
 pub enum Error {
+    #[cfg(feature = "json-using-serde")]
+    /// Ran into a serde error.
+    SerdeJsonError(serde_json::Error),
+
     /// Ran into an IO problem while loading the response.
     IoError(io::Error),
     /// Couldn't parse the incoming chunk's length while receiving a
@@ -28,10 +32,6 @@ pub enum Error {
     /// please open an issue, and include the string inside this
     /// error, as it can be used to locate the problem.
     Other(&'static str),
-
-    #[cfg(feature = "json-using-serde")]
-    /// Ran into a serde error.
-    SerdeJsonError(serde_json::Error),
 }
 
 impl fmt::Display for Error {
