@@ -18,25 +18,24 @@ pub struct Response {
 
 impl Response {
     pub(crate) fn create<T: Read>(
-        parent: ResponseLazy<T>,
+        mut parent: ResponseLazy<T>,
         is_head: bool,
     ) -> Result<Response, Error> {
-        let ResponseLazy {
-            status_code,
-            reason_phrase,
-            headers,
-            iter,
-            ..
-        } = parent;
-
         let mut body = Vec::new();
         if !is_head {
-            for byte in iter {
+            for byte in &mut parent {
                 let (byte, length) = byte?;
                 body.reserve(length);
                 body.push(byte);
             }
         }
+
+        let ResponseLazy {
+            status_code,
+            reason_phrase,
+            headers,
+            ..
+        } = parent;
 
         Ok(Response {
             status_code,
@@ -151,7 +150,9 @@ pub struct ResponseLazy<T: Read> {
     /// header.
     pub content_length: Option<usize>,
 
-    iter: ResponseIter<T>,
+    stream: Bytes<T>,
+    chunked: bool,
+    chunks_done: bool,
 }
 
 impl<T: Read> ResponseLazy<T> {
@@ -170,45 +171,14 @@ impl<T: Read> ResponseLazy<T> {
             reason_phrase,
             headers,
             content_length,
-            iter: ResponseIter::new(
-                stream,
-                chunked,
-                if chunked { Some(0) } else { content_length },
-            ),
+            stream,
+            chunked,
+            chunks_done: false,
         })
     }
 }
 
 impl<T: Read> Iterator for ResponseLazy<T> {
-    type Item = Result<(u8, usize), Error>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.iter.next()
-    }
-}
-
-struct ResponseIter<T: Read> {
-    bytes: Bytes<T>,
-    chunked: bool,
-    chunks_done: bool,
-    content_length: Option<usize>,
-}
-
-impl<T: Read> ResponseIter<T> {
-    fn new(bytes: Bytes<T>, chunked: bool, content_length: Option<usize>) -> ResponseIter<T> {
-        ResponseIter {
-            bytes,
-            chunked,
-            chunks_done: false,
-            content_length,
-        }
-    }
-}
-
-impl<T: Read> Iterator for ResponseIter<T> {
-    // u8 is the byte that was read, usize is how much you should
-    // reserve in a Vec if you're pushing the bytes into it for
-    // optimal operation.
     type Item = Result<(u8, usize), Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -220,7 +190,7 @@ impl<T: Read> Iterator for ResponseIter<T> {
             if let Some(content_length) = self.content_length {
                 if content_length == 0 {
                     // Get the size of the next chunk
-                    let count_line = match read_line(&mut self.bytes) {
+                    let count_line = match read_line(&mut self.stream) {
                         Ok(line) => line,
                         Err(err) => return Some(Err(err)),
                     };
@@ -247,12 +217,12 @@ impl<T: Read> Iterator for ResponseIter<T> {
             if content_length > 0 {
                 self.content_length = Some(content_length - 1);
 
-                if let Some(byte) = self.bytes.next() {
+                if let Some(byte) = self.stream.next() {
                     match byte {
                         Ok(byte) => {
                             if self.chunked && content_length - 1 == 0 {
                                 // The last byte of the chunk was read, pop the trailing \r\n
-                                if let Err(err) = read_line(&mut self.bytes) {
+                                if let Err(err) = read_line(&mut self.stream) {
                                     return Some(Err(err));
                                 }
                             }
@@ -268,7 +238,7 @@ impl<T: Read> Iterator for ResponseIter<T> {
             // Content-Length wasn't specified, and this is not a
             // chunked transfer. So just keep getting the bytes until
             // the connection ends, I guess?
-            if let Some(byte) = self.bytes.next() {
+            if let Some(byte) = self.stream.next() {
                 match byte {
                     Ok(byte) => return Some(Ok((byte, 1))),
                     Err(err) => return Some(Err(Error::IoError(err))),
