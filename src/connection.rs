@@ -25,7 +25,6 @@ lazy_static::lazy_static! {
 
 /// A connection to the server for sending
 /// [`Request`](struct.Request.html)s.
-#[derive(Debug)]
 pub struct Connection {
     request: Request,
     timeout: Option<u64>,

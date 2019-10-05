@@ -6,16 +6,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
-- Loading HTTP responses through an iterator, allowing processing the
-  data during the download.
+- API for loading the HTTP response body through an iterator, allowing
+  for processing of the data during the download.
+- Error type for all the errors that this crate can run into for
+  easier `?` usage and better debuggability.
 
 ### Changed
-- Updated dependencies
+- Update dependencies.
 - Restructure the `Response` struct in a major, breaking way.
+- Clean up the crate internals overall. **Note**: This might cause
+  instability, if you're very concerned about stability, please hold
+  off upgrading for a while.
 
 ### Fixed
-- Changed ip in tests from `0.0.0.0` to `localhost` to fix them
-  running on Windows.
+- Test on Windows by changing the ip in tests from `0.0.0.0` to
+  `localhost`.
 
 ## [1.4.0] - 2019-07-13
 ### Added
