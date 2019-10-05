@@ -1,4 +1,4 @@
-use crate::Error;
+use crate::{connection::HttpStream, Error};
 use std::collections::HashMap;
 use std::io::{Bytes, Read};
 use std::str;
@@ -17,10 +17,7 @@ pub struct Response {
 }
 
 impl Response {
-    pub(crate) fn create<T: Read>(
-        mut parent: ResponseLazy<T>,
-        is_head: bool,
-    ) -> Result<Response, Error> {
+    pub(crate) fn create(mut parent: ResponseLazy, is_head: bool) -> Result<Response, Error> {
         let mut body = Vec::new();
         if !is_head {
             for byte in &mut parent {
@@ -137,7 +134,7 @@ impl Response {
 /// # }
 ///
 /// ```
-pub struct ResponseLazy<T: Read> {
+pub struct ResponseLazy {
     /// The status code of the response, eg. 404.
     pub status_code: i32,
     /// The reason phrase of the response, eg. "Not Found".
@@ -150,13 +147,13 @@ pub struct ResponseLazy<T: Read> {
     /// header.
     pub content_length: Option<usize>,
 
-    stream: Bytes<T>,
+    stream: Bytes<HttpStream>,
     chunked: bool,
     chunks_done: bool,
 }
 
-impl<T: Read> ResponseLazy<T> {
-    pub(crate) fn from_stream(stream: T) -> Result<ResponseLazy<T>, Error> {
+impl ResponseLazy {
+    pub(crate) fn from_stream(stream: HttpStream) -> Result<ResponseLazy, Error> {
         let mut stream = stream.bytes();
         let ResponseMetadata {
             status_code,
@@ -178,7 +175,7 @@ impl<T: Read> ResponseLazy<T> {
     }
 }
 
-impl<T: Read> Iterator for ResponseLazy<T> {
+impl Iterator for ResponseLazy {
     type Item = Result<(u8, usize), Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -261,7 +258,7 @@ struct ResponseMetadata {
     content_length: Option<usize>,
 }
 
-fn read_metadata<T: Read>(stream: &mut Bytes<T>) -> Result<ResponseMetadata, Error> {
+fn read_metadata(stream: &mut Bytes<HttpStream>) -> Result<ResponseMetadata, Error> {
     let (status_code, reason_phrase) = parse_status_line(read_line(stream)?);
     let mut headers = HashMap::new();
     let mut chunked = false;
@@ -300,7 +297,7 @@ fn read_metadata<T: Read>(stream: &mut Bytes<T>) -> Result<ResponseMetadata, Err
     })
 }
 
-fn read_line<T: Read>(stream: &mut Bytes<T>) -> Result<String, Error> {
+fn read_line(stream: &mut Bytes<HttpStream>) -> Result<String, Error> {
     let mut bytes = Vec::with_capacity(32);
     for byte in stream {
         match byte {

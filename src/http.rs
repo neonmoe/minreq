@@ -52,7 +52,6 @@ impl fmt::Display for Method {
 }
 
 /// An HTTP request.
-#[derive(Debug)]
 pub struct Request {
     pub(crate) method: Method,
     pub(crate) host: URL,
@@ -135,6 +134,20 @@ impl Request {
     #[cfg(feature = "https")]
     pub fn send(self) -> Result<Response, Error> {
         if self.https {
+            let is_head = self.method == Method::Head;
+            let response = Connection::new(self).send_https()?;
+            Response::create(response, is_head)
+        } else {
+            let is_head = self.method == Method::Head;
+            let response = Connection::new(self).send()?;
+            Response::create(response, is_head)
+        }
+    }
+
+    /// Sends this request to the host, loaded lazily.
+    #[cfg(feature = "https")]
+    pub fn send_lazy(self) -> Result<ResponseLazy, Error> {
+        if self.https {
             Connection::new(self).send_https()
         } else {
             Connection::new(self).send()
@@ -153,9 +166,9 @@ impl Request {
         }
     }
 
-    /// Sends this request to the host.
+    /// Sends this request to the host, loaded lazily.
     #[cfg(not(feature = "https"))]
-    pub fn send_lazy(self) -> Result<ResponseLazy<std::io::BufReader<std::net::TcpStream>>, Error> {
+    pub fn send_lazy(self) -> Result<ResponseLazy, Error> {
         if self.https {
             panic!("Can't send requests to urls that start with https:// when the `https` feature is not enabled!")
         } else {

@@ -1,8 +1,8 @@
 use crate::{http, Error, Request, ResponseLazy};
 #[cfg(feature = "https")]
-use rustls::{self, ClientConfig, ClientSession};
+use rustls::{self, ClientConfig, ClientSession, StreamOwned};
 use std::env;
-use std::io::{BufReader, BufWriter, Write};
+use std::io::{self, BufReader, BufWriter, Read, Write};
 use std::net::{TcpStream, ToSocketAddrs};
 #[cfg(feature = "https")]
 use std::sync::Arc;
@@ -21,6 +21,37 @@ lazy_static::lazy_static! {
             .add_server_trust_anchors(&TLS_SERVER_ROOTS);
         Arc::new(config)
     };
+}
+
+type UnsecuredStream = BufReader<TcpStream>;
+#[cfg(feature = "https")]
+type SecuredStream = StreamOwned<ClientSession, TcpStream>;
+
+pub(crate) enum HttpStream {
+    Unsecured(UnsecuredStream),
+    #[cfg(feature = "https")]
+    Secured(SecuredStream),
+}
+
+impl HttpStream {
+    fn create_unsecured(reader: UnsecuredStream) -> HttpStream {
+        HttpStream::Unsecured(reader)
+    }
+
+    #[cfg(feature = "https")]
+    fn create_secured(reader: SecuredStream) -> HttpStream {
+        HttpStream::Secured(reader)
+    }
+}
+
+impl Read for HttpStream {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        match self {
+            HttpStream::Unsecured(inner) => inner.read(buf),
+            #[cfg(feature = "https")]
+            HttpStream::Secured(inner) => inner.read(buf),
+        }
+    }
 }
 
 /// A connection to the server for sending
@@ -47,36 +78,39 @@ impl Connection {
     /// Sends the [`Request`](struct.Request.html), consumes this
     /// connection, and returns a [`Response`](struct.Response.html).
     #[cfg(feature = "https")]
-    pub(crate) fn send_https(self) -> Result<Response, Error> {
-        let is_head = self.request.method == http::Method::Head;
+    pub(crate) fn send_https(self) -> Result<ResponseLazy, Error> {
         let bytes = self.request.to_string().into_bytes();
 
         // Rustls setup
         let dns_name = &self.request.host;
         let dns_name = dns_name.split(":").next().unwrap();
         let dns_name = DNSNameRef::try_from_ascii_str(dns_name).unwrap();
-        let mut sess = ClientSession::new(&CONFIG, dns_name);
+        let sess = ClientSession::new(&CONFIG, dns_name);
 
-        // IO
-        let mut stream = create_tcp_stream(&self.request.host, self.timeout)?;
-        let mut tls = rustls::Stream::new(&mut sess, &mut stream);
-        tls.write(&bytes)?;
-        match read_from_stream(tls, is_head) {
-            Ok(result) => handle_redirects(self, Response::from_bytes(result)),
-            Err(err) => Err(err),
+        let tcp = match create_tcp_stream(&self.request.host, self.timeout) {
+            Ok(tcp) => tcp,
+            Err(err) => return Err(Error::IoError(err)),
+        };
+
+        // Send request
+        let mut tls = StreamOwned::new(sess, tcp);
+        if let Err(err) = tls.write(&bytes) {
+            return Err(Error::IoError(err));
         }
+
+        // Receive request
+        let response = ResponseLazy::from_stream(HttpStream::create_secured(tls))?;
+        handle_redirects(self, response)
     }
 
     /// Sends the [`Request`](struct.Request.html), consumes this
     /// connection, and returns a [`Response`](struct.Response.html).
-    pub(crate) fn send(self) -> Result<ResponseLazy<BufReader<TcpStream>>, Error> {
+    pub(crate) fn send(self) -> Result<ResponseLazy, Error> {
         let bytes = self.request.to_string().into_bytes();
 
         let tcp = match create_tcp_stream(&self.request.host, self.timeout) {
-            Ok(stream) => stream,
-            Err(err) => {
-                return Err(Error::IoError(err));
-            }
+            Ok(tcp) => tcp,
+            Err(err) => return Err(Error::IoError(err)),
         };
 
         // Send request
@@ -87,29 +121,38 @@ impl Connection {
 
         // Receive response
         let tcp = match stream.into_inner() {
-            Ok(stream) => stream,
+            Ok(tcp) => tcp,
             Err(_) => {
                 return Err(Error::Other(
                     "IntoInnerError after writing the request into the TcpStream.",
                 ));
             }
         };
-        let stream = BufReader::new(tcp);
+        let stream = HttpStream::create_unsecured(BufReader::new(tcp));
         let response = ResponseLazy::from_stream(stream)?;
         handle_redirects(self, response)
     }
 }
 
-fn handle_redirects(
-    connection: Connection,
-    response: ResponseLazy<BufReader<TcpStream>>,
-) -> Result<ResponseLazy<BufReader<TcpStream>>, Error> {
+fn handle_redirects(connection: Connection, response: ResponseLazy) -> Result<ResponseLazy, Error> {
     let status_code = response.status_code;
+    let url = response.headers.get("Location");
+    if let Some(request) = get_redirect(connection, status_code, url) {
+        request?.send_lazy()
+    } else {
+        Ok(response)
+    }
+}
+
+fn get_redirect(
+    connection: Connection,
+    status_code: i32,
+    url: Option<&String>,
+) -> Option<Result<Request, Error>> {
     match status_code {
         301 | 302 | 303 | 307 => {
-            let url = response.headers.get("Location");
             if url.is_none() {
-                return Err(Error::RedirectLocationMissing);
+                return Some(Err(Error::RedirectLocationMissing));
             }
             let url = url.unwrap();
 
@@ -123,13 +166,13 @@ fn handle_redirects(
                     }
                 }
 
-                request.send_lazy()
+                Some(Ok(request))
             } else {
-                Err(Error::InfiniteRedirectionLoop)
+                Some(Err(Error::InfiniteRedirectionLoop))
             }
         }
 
-        _ => Ok(response),
+        _ => None,
     }
 }
 
