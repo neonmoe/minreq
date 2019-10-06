@@ -4,7 +4,7 @@ use std::io::{Bytes, Read};
 use std::str;
 
 /// An HTTP response.
-#[derive(Debug, Clone)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct Response {
     /// The status code of the response, eg. 404.
     pub status_code: i32,

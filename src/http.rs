@@ -52,6 +52,7 @@ impl fmt::Display for Method {
 }
 
 /// An HTTP request.
+#[derive(Clone, PartialEq, Debug)]
 pub struct Request {
     pub(crate) method: Method,
     pub(crate) host: URL,
