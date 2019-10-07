@@ -78,7 +78,8 @@ impl Connection {
     /// Sends the [`Request`](struct.Request.html), consumes this
     /// connection, and returns a [`Response`](struct.Response.html).
     #[cfg(feature = "https")]
-    pub(crate) fn send_https(self) -> Result<ResponseLazy, Error> {
+    pub(crate) fn send_https(mut self) -> Result<ResponseLazy, Error> {
+        self.request.host = ensure_ascii_host(self.request.host)?;
         let bytes = self.request.to_string().into_bytes();
 
         // Rustls setup
@@ -105,7 +106,8 @@ impl Connection {
 
     /// Sends the [`Request`](struct.Request.html), consumes this
     /// connection, and returns a [`Response`](struct.Response.html).
-    pub(crate) fn send(self) -> Result<ResponseLazy, Error> {
+    pub(crate) fn send(mut self) -> Result<ResponseLazy, Error> {
+        self.request.host = ensure_ascii_host(self.request.host)?;
         let bytes = self.request.to_string().into_bytes();
 
         let tcp = match create_tcp_stream(&self.request.host, self.timeout) {
@@ -187,4 +189,34 @@ where
         stream.set_write_timeout(dur)?;
     }
     Ok(stream)
+}
+
+fn ensure_ascii_host(host: String) -> Result<String, Error> {
+    if host.is_ascii() {
+        Ok(host)
+    } else {
+        #[cfg(not(feature = "punycode"))]
+        {
+            Err(Error::PunycodeFeatureNotEnabled)
+        }
+
+        #[cfg(feature = "punycode")]
+        {
+            let mut result = String::with_capacity(host.len() * 2);
+            for s in host.split('.') {
+                if s.is_ascii() {
+                    result += s;
+                } else {
+                    match punycode::encode(s) {
+                        Ok(s) => result = result + "xn--" + &s,
+                        Err(_) => return Err(Error::PunycodeConversionFailed),
+                    }
+                }
+                result += ".";
+            }
+            result.truncate(result.len() - 1); // Remove the trailing dot
+            println!("{}", result);
+            Ok(result)
+        }
+    }
 }

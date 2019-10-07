@@ -159,7 +159,7 @@ impl Request {
     #[cfg(not(feature = "https"))]
     pub fn send(self) -> Result<Response, Error> {
         if self.https {
-            panic!("Can't send requests to urls that start with https:// when the `https` feature is not enabled!")
+            Err(Error::HttpsFeatureNotEnabled)
         } else {
             let is_head = self.method == Method::Head;
             let response = Connection::new(self).send()?;
@@ -171,7 +171,7 @@ impl Request {
     #[cfg(not(feature = "https"))]
     pub fn send_lazy(self) -> Result<ResponseLazy, Error> {
         if self.https {
-            panic!("Can't send requests to urls that start with https:// when the `https` feature is not enabled!")
+            Err(Error::HttpsFeatureNotEnabled)
         } else {
             Connection::new(self).send()
         }

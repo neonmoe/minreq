@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   for processing of the data during the download.
 - Error type for all the errors that this crate can run into for
   easier `?` usage and better debuggability.
+- Punycode support for non-ascii hostnames via the `punycode` feature.
 
 ### Changed
 - Update dependencies.
@@ -17,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Clean up the crate internals overall. **Note**: This might cause
   instability, if you're very concerned about stability, please hold
   off upgrading for a while.
+- Remove `panic!` when trying to make an `https://` request without
+  the `https` feature. The request will now return an error
+  instead. The library should not panic anymore.
+- Remove remaining `unwrap()`s from library code.
 
 ### Fixed
 - Test on Windows by changing the ip in tests from `0.0.0.0` to

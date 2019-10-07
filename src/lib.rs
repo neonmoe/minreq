@@ -18,8 +18,13 @@
 //!
 //! ## `https`
 //!
-//! This feature uses the (very good) [`rustls`](https://crates.io/crates/rustls)
-//! crate to secure connection.
+//! This feature uses the (very good)
+//! [`rustls`](https://crates.io/crates/rustls) crate to secure the
+//! connection when needed. Note that if this feature is not enabled
+//! (and it is not by default), requests to urls that start with
+//! `https://` will fail and return a
+//! [`HttpsFeatureNotEnabled`](enum.Error.html#variant.HttpsFeatureNotEnabled)
+//! error.
 //!
 //! ## `json-using-serde`
 //!
@@ -40,6 +45,10 @@
 //! if let Ok(response) = minreq::get("http://httpbin.org/ip").send() {
 //!     println!("{}", response.as_str().unwrap());
 //! }
+//!
+//! // Note: you could change the `get` function to `head` or `put` or
+//! // any other HTTP request method: the api is the same for all of
+//! // them, it just changes what is sent to the server.
 //! ```
 //!
 //! ## Body
@@ -58,7 +67,7 @@
 //! // To add a header, add .with_header("Key", "Value") before .send().
 //! if let Ok(response) = minreq::get("http://httpbin.org/headers")
 //!     .with_header("Accept", "text/plain")
-//!     .with_header("Something", "Interesting")
+//!     .with_header("X-Best-Mon", "Sylveon")
 //!     .send()
 //! {
 //!     println!("{}", response.as_str().unwrap());
@@ -67,7 +76,7 @@
 //!
 //! ## Timeouts
 //! ```no_run
-//! // To avoid timing out, or limit the request's response time even more,
+//! // To avoid timing out, or limit the request's response time,
 //! // use .with_timeout(n) before .send(). The given value is in seconds.
 //! // NOTE: There is no timeout by default.
 //! if let Ok(response) = minreq::post("http://httpbin.org/delay/6")
@@ -98,6 +107,8 @@
 //!
 //!   env::set_var("MINREQ_TIMEOUT", "8");
 //!   ```
+//! If the timeout is set with `with_timeout`, the environment
+//! variable will be ignored.
 
 #![deny(missing_docs)]
 

@@ -277,6 +277,7 @@ fn read_metadata(stream: &mut Bytes<HttpStream>) -> Result<ResponseMetadata, Err
                 && header.1.to_lowercase().trim() == "chunked"
             {
                 chunked = true;
+                content_length = Some(0);
             }
             if content_length.is_none() && header.0.to_lowercase().trim() == "content-length" {
                 match str::parse::<usize>(&header.1.trim()) {
