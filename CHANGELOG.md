@@ -21,7 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Remove `panic!` when trying to make an `https://` request without
   the `https` feature. The request will now return an error
   instead. The library should not panic anymore.
-- Remove remaining `unwrap()`s from library code.
+- Audit the remaining `unwrap()`s from library code, none of them 
+  should actually ever cause a panic now.
 
 ### Fixed
 - Test on Windows by changing the ip in tests from `0.0.0.0` to
