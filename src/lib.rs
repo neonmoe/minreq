@@ -46,10 +46,10 @@
 //!     println!("{}", response.as_str().unwrap());
 //! }
 //!
-//! // Note: you could change the `get` function to `head` or `put` or
-//! // any other HTTP request method: the api is the same for all of
-//! // them, it just changes what is sent to the server.
 //! ```
+//! Note: you could change the `get` function to `head` or `put` or
+//! any other HTTP request method: the api is the same for all of
+//! them, it just changes what is sent to the server.
 //!
 //! ## Body
 //! ```no_run

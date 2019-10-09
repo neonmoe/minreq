@@ -21,6 +21,7 @@ pub enum Error {
     /// missing.
     RedirectLocationMissing,
     /// The response redirections caused an infinite redirection loop.
+    // FIXME: Differentiate between infinite loops and reaching the max
     InfiniteRedirectionLoop,
     /// The response contained invalid UTF-8 where it should be valid
     /// (eg. headers).

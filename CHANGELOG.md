@@ -14,7 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Update dependencies.
-- Restructure the `Response` struct in a major, breaking way.
+- Restructure the `Response` struct: make the `body` field into a
+  `Vec<u8>` (was `String`) and remove `body_bytes`. Added `as_str()`
+  for reading the body as a string.
 - Clean up the crate internals overall. **Note**: This might cause
   instability, if you're very concerned about stability, please hold
   off upgrading for a while.
@@ -27,6 +29,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Test on Windows by changing the ip in tests from `0.0.0.0` to
   `localhost`.
+
+### Removed
+- `create_request` in favor of just using `Response::new`.
 
 ## [1.4.0] - 2019-07-13
 ### Added

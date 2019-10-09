@@ -13,6 +13,7 @@ pub struct Response {
     /// The headers of the response.
     pub headers: HashMap<String, String>,
     /// The body of the response.
+    // TODO: Consider making body private and adding as_bytes and into_bytes.
     pub body: Vec<u8>,
 }
 
@@ -141,13 +142,9 @@ pub struct ResponseLazy {
     pub reason_phrase: String,
     /// The headers of the response.
     pub headers: HashMap<String, String>,
-    /// The expected content length, if known.
-    ///
-    /// This is just for convenience, sourced from the Content-Length
-    /// header.
-    pub content_length: Option<usize>,
 
     stream: Bytes<HttpStream>,
+    content_length: Option<usize>,
     chunked: bool,
     chunks_done: bool,
 }
