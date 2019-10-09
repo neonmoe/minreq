@@ -125,11 +125,9 @@ extern crate webpki_roots;
 
 mod connection;
 mod error;
-mod http;
-mod requests;
+mod request;
 mod response;
 
 pub use error::*;
-pub use http::*;
-pub use requests::*;
+pub use request::*;
 pub use response::*;

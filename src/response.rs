@@ -65,7 +65,7 @@ impl Response {
     pub fn as_str(&self) -> Result<&str, Error> {
         match str::from_utf8(&self.body) {
             Ok(s) => Ok(s),
-            Err(_) => Err(Error::InvalidUtf8InBody),
+            Err(err) => Err(Error::InvalidUtf8InBody(err)),
         }
     }
 

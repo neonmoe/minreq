@@ -69,7 +69,7 @@ fn test_custom_method() {
     use minreq::Method;
     setup();
     let body = get_body(
-        minreq::create_request(Method::Custom("GET".to_string()), url("/a"))
+        minreq::Request::new(Method::Custom("GET".to_string()), url("/a"))
             .with_body("Q")
             .send(),
     );

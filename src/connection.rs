@@ -1,4 +1,4 @@
-use crate::{http, Error, Request, ResponseLazy};
+use crate::{Error, Method, Request, ResponseLazy};
 #[cfg(feature = "https")]
 use rustls::{self, ClientConfig, ClientSession, StreamOwned};
 use std::env;
@@ -158,19 +158,20 @@ fn get_redirect(
             }
             let url = url.unwrap();
 
-            if let Some(mut request) = connection.request.redirect_to(url.clone()) {
-                if status_code == 303 {
-                    match request.method {
-                        http::Method::Post | http::Method::Put | http::Method::Delete => {
-                            request.method = http::Method::Get;
+            match connection.request.redirect_to(url.clone()) {
+                Ok(mut request) => {
+                    if status_code == 303 {
+                        match request.method {
+                            Method::Post | Method::Put | Method::Delete => {
+                                request.method = Method::Get;
+                            }
+                            _ => {}
                         }
-                        _ => {}
                     }
-                }
 
-                Some(Ok(request))
-            } else {
-                Some(Err(Error::InfiniteRedirectionLoop))
+                    Some(Ok(request))
+                }
+                Err(err) => Some(Err(err)),
             }
         }
 

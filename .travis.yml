@@ -5,8 +5,9 @@ rust:
   - nightly
 script:
   - cargo test
-  - cargo test --features "https"
   - cargo test --release
-  - cargo test --features "https" --release
+  - cargo test --all-features
+  - cargo test --all-features --release
+  - cargo test --features "https"
   - cargo test --features "json-using-serde"
-  - cargo test --features "json-using-serde" --release
+  - cargo test --features "punycode"

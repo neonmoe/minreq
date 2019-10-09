@@ -1,6 +1,4 @@
-use std::error;
-use std::fmt;
-use std::io;
+use std::{error, fmt, io, str};
 
 /// Represents an error while sending, receiving, or parsing an HTTP response.
 #[derive(Debug)]
@@ -8,9 +6,12 @@ pub enum Error {
     #[cfg(feature = "json-using-serde")]
     /// Ran into a serde error.
     SerdeJsonError(serde_json::Error),
-
     /// Ran into an IO problem while loading the response.
     IoError(io::Error),
+    /// The response body contains invalid UTF-8, so the `as_str()`
+    /// conversion failed.
+    InvalidUtf8InBody(str::Utf8Error),
+
     /// Couldn't parse the incoming chunk's length while receiving a
     /// response with the header `Transfer-Encoding: chunked`.
     MalformedChunkLength,
@@ -21,15 +22,14 @@ pub enum Error {
     /// missing.
     RedirectLocationMissing,
     /// The response redirections caused an infinite redirection loop.
-    // FIXME: Differentiate between infinite loops and reaching the max
     InfiniteRedirectionLoop,
+    /// Followed
+    /// [`max_redirections`](struct.Request.html#method.with_max_redirections)
+    /// redirections, won't follow any more.
+    TooManyRedirections,
     /// The response contained invalid UTF-8 where it should be valid
     /// (eg. headers).
     InvalidUtf8InResponse,
-    /// The response body contains invalid UTF-8, so the `as_str()`
-    /// conversion failed.
-    // FIXME: Add the inner Utf8Error here?
-    InvalidUtf8InBody,
     /// Tried to send a secure request (ie. the url started with
     /// `https://`), but the crate's `https` feature was not enabled,
     /// and as such, a connection cannot be made.
@@ -55,20 +55,21 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         use Error::*;
         match self {
+            #[cfg(feature = "json-using-serde")]
+            SerdeJsonError(err) => write!(f, "{}", err),
             IoError(err) => write!(f, "{}", err),
+            InvalidUtf8InBody(err) => write!(f, "{}", err),
+
             MalformedChunkLength => write!(f, "non-usize chunk length with transfer-encoding: chunked"),
             MalformedContentLength => write!(f, "non-usize content length"),
             RedirectLocationMissing => write!(f, "redirection location header missing"),
             InfiniteRedirectionLoop => write!(f, "infinite redirection loop detected"),
+            TooManyRedirections => write!(f, "too many redirections (over the max)"),
             InvalidUtf8InResponse => write!(f, "response contained invalid utf-8 where valid utf-8 was expected"),
-            InvalidUtf8InBody => write!(f, "response body contains invalid utf-8, so it can't be converted into a string"),
             HttpsFeatureNotEnabled => write!(f, "request url contains https:// but the https feature is not enabled"),
             PunycodeFeatureNotEnabled => write!(f, "non-ascii urls needs to be converted into punycode, and the feature is missing"),
             PunycodeConversionFailed => write!(f, "non-ascii url conversion to punycode failed"),
             Other(msg) => write!(f, "error in minreq: please open an issue in the minreq repo, include the following: '{}'", msg),
-
-            #[cfg(feature = "json-using-serde")]
-            SerdeJsonError(err) => write!(f, "{}", err),
         }
     }
 }
@@ -77,9 +78,10 @@ impl error::Error for Error {
     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         use Error::*;
         match self {
-            IoError(err) => Some(err),
             #[cfg(feature = "json-using-serde")]
             SerdeJsonError(err) => Some(err),
+            IoError(err) => Some(err),
+            InvalidUtf8InBody(err) => Some(err),
             _ => None,
         }
     }
