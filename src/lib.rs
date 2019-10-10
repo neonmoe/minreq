@@ -6,12 +6,13 @@
 //! # Additional features
 //!
 //! Since the crate is supposed to be minimal in terms of
-//! dependencies, optional functionality can be enabled by specifying
-//! features for `minreq` dependency in `Cargo.toml`:
+//! dependencies, there are no default features, and optional
+//! functionality can be enabled by specifying features for `minreq`
+//! dependency in `Cargo.toml`:
 //!
 //! ```toml
 //! [dependencies]
-//! minreq = { version = "*", features = ["https", "json-using-serde"] }
+//! minreq = { version = "*", features = ["https", "json-using-serde", "punycode"] }
 //! ```
 //!
 //! Below is the list of all available features.
@@ -34,6 +35,17 @@
 //!
 //! `Request` and `Response` expose `with_json()` and `json()` respectively
 //! for converting struct to JSON and back.
+//!
+//! ## `punycode`
+//!
+//! This feature enables requests to non-ascii domains: the
+//! [`punycode`](https://crates.io/crates/punycode) crate is used to
+//! convert the non-ascii parts into their punycode representations
+//! before making the request. If you try to make a request to 㯙㯜㯙
+//! 㯟.net or i❤.ws for example, with this feature disabled (as it is
+//! by default), your request will fail with a
+//! [`PunycodeFeatureNotEnabled`](enum.Error.html#variant.PunycodeFeatureNotEnabled)
+//! error.
 //!
 //! # Examples
 //!

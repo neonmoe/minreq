@@ -101,6 +101,13 @@ impl Request {
     }
 
     /// Converts given argument to JSON and sets it as body.
+    ///
+    /// # Errors
+    ///
+    /// Returns
+    /// [`SerdeJsonError`](enum.Error.html#variant.SerdeJsonError) if
+    /// Serde runs into a problem when converting `body` into a
+    /// string.
     #[cfg(feature = "json-using-serde")]
     pub fn with_json<T: serde::ser::Serialize>(mut self, body: &T) -> Result<Request, Error> {
         self.headers.insert(
@@ -132,6 +139,15 @@ impl Request {
     }
 
     /// Sends this request to the host.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` if we run into an error while sending the
+    /// request, or receiving/parsing the response. The specific error
+    /// is described in the `Err`, and it can be any
+    /// [`minreq::Error`](enum.Error.html) except
+    /// [`SerdeJsonError`](enum.Error.html#variant.SerdeJsonError) and
+    /// [`InvalidUtf8InBody`](enum.Error.html#variant.InvalidUtf8InBody).
     #[cfg(feature = "https")]
     pub fn send(self) -> Result<Response, Error> {
         if self.https {
@@ -146,6 +162,15 @@ impl Request {
     }
 
     /// Sends this request to the host, loaded lazily.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` if we run into an error while sending the
+    /// request, or receiving/parsing the response. The specific error
+    /// is described in the `Err`, and it can be any
+    /// [`minreq::Error`](enum.Error.html) except
+    /// [`SerdeJsonError`](enum.Error.html#variant.SerdeJsonError) and
+    /// [`InvalidUtf8InBody`](enum.Error.html#variant.InvalidUtf8InBody).
     #[cfg(feature = "https")]
     pub fn send_lazy(self) -> Result<ResponseLazy, Error> {
         if self.https {
@@ -156,6 +181,15 @@ impl Request {
     }
 
     /// Sends this request to the host.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` if we run into an error while sending the
+    /// request, or receiving/parsing the response. The specific error
+    /// is described in the `Err`, and it can be any
+    /// [`minreq::Error`](enum.Error.html) except
+    /// [`SerdeJsonError`](enum.Error.html#variant.SerdeJsonError) and
+    /// [`InvalidUtf8InBody`](enum.Error.html#variant.InvalidUtf8InBody).
     #[cfg(not(feature = "https"))]
     pub fn send(self) -> Result<Response, Error> {
         if self.https {
@@ -168,6 +202,15 @@ impl Request {
     }
 
     /// Sends this request to the host, loaded lazily.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` if we run into an error while sending the
+    /// request, or receiving/parsing the response. The specific error
+    /// is described in the `Err`, and it can be any
+    /// [`minreq::Error`](enum.Error.html) except
+    /// [`SerdeJsonError`](enum.Error.html#variant.SerdeJsonError) and
+    /// [`InvalidUtf8InBody`](enum.Error.html#variant.InvalidUtf8InBody).
     #[cfg(not(feature = "https"))]
     pub fn send_lazy(self) -> Result<ResponseLazy, Error> {
         if self.https {

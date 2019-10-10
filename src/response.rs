@@ -52,22 +52,24 @@ impl Response {
         })
     }
 
-    /// Returns a `&str` constructed from the body of the
-    /// `Response`.
+    /// Returns the body as an `&str`.
     ///
-    /// Returns a `Result`, as it is possible that the returned bytes
-    /// are not valid UTF-8: the message can be corrupted on the
-    /// server's side, it could be still loading (`flush()` not yet
-    /// called, for example), or the returned message could simply not
-    /// be valid UTF-8.
+    /// ## Implementation note
     ///
-    /// Implementation note: This is basically just a branch and a
-    /// `std::str::from_utf8(&response.body)` the first time you call
-    /// this, and `std::str::from_utf8_unchecked(&response.body)`
-    /// after that: the UTF-8 validity is cached within the
-    /// `Response`.
+    /// As the body of the `Response` is never mutated, it is safe to
+    /// only check its UTF-8 validity once. Because of that, this
+    /// function might take a few microseconds the first time you call
+    /// it, but it will be practically free after that, as the result
+    /// of the check is cached within the `Response`.
     ///
-    /// Usage:
+    /// # Errors
+    ///
+    /// Returns
+    /// [`InvalidUtf8InBody`](enum.Error.html#variant.InvalidUtf8InBody)
+    /// if the body is not UTF-8, with a description as to why the
+    /// provided slice is not UTF-8.
+    ///
+    /// # Example
     /// ```no_run
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let url = "http://example.org/";
@@ -121,7 +123,7 @@ impl Response {
     /// let response = minreq::get(url).send()?;
     /// println!("{:?}", response.into_bytes());
     /// // This would error, as into_bytes consumes the Response:
-    /// // println!("{:?}", response.headers.get("Content-Type"));
+    /// // let x = response.status_code;
     /// # Ok(())
     /// # }
     /// ```
@@ -131,6 +133,15 @@ impl Response {
 
     /// Converts JSON body to a `struct` using Serde.
     ///
+    /// # Errors
+    ///
+    /// Returns
+    /// [`SerdeJsonError`](enum.Error.html#variant.SerdeJsonError) if
+    /// Serde runs into a problem, or
+    /// [`InvalidUtf8InBody`](enum.Error.html#variant.InvalidUtf8InBody)
+    /// if the body is not UTF-8.
+    ///
+    /// # Example
     /// In case compiler cannot figure out return type you might need to declare it explicitly:
     ///
     /// ```no_run
@@ -142,13 +153,13 @@ impl Response {
     ///     email: String,
     /// }
     ///
-    /// # fn main() {
+    /// # fn main() -> Result<(), minreq::Error> {
     /// # let url_to_json_resource = "http://example.org/resource.json";
-    /// let user_name = minreq::get(url_to_json_resource)
-    ///     .send().unwrap()
-    ///     .json::<User>().unwrap() // explicitly declared type `User`
+    /// let user_name = minreq::get(url_to_json_resource).send()?
+    ///     .json::<User>()? // explicitly declared type `User`
     ///     .name;
     /// println!("User name is '{}'", &user_name);
+    /// # Ok(())
     /// # }
     /// ```
     #[cfg(feature = "json-using-serde")]

@@ -4,14 +4,14 @@ use std::{error, fmt, io, str};
 #[derive(Debug)]
 pub enum Error {
     #[cfg(feature = "json-using-serde")]
-    /// Ran into a serde error.
+    /// Ran into a Serde error.
     SerdeJsonError(serde_json::Error),
-    /// Ran into an IO problem while loading the response.
-    IoError(io::Error),
     /// The response body contains invalid UTF-8, so the `as_str()`
     /// conversion failed.
     InvalidUtf8InBody(str::Utf8Error),
 
+    /// Ran into an IO problem while loading the response.
+    IoError(io::Error),
     /// Couldn't parse the incoming chunk's length while receiving a
     /// response with the header `Transfer-Encoding: chunked`.
     MalformedChunkLength,
@@ -28,8 +28,12 @@ pub enum Error {
     /// redirections, won't follow any more.
     TooManyRedirections,
     /// The response contained invalid UTF-8 where it should be valid
-    /// (eg. headers).
+    /// (eg. headers), so the response cannot interpreted correctly.
     InvalidUtf8InResponse,
+    /// The provided url contained a domain that has non-ASCII
+    /// characters, and could not be converted into punycode. It is
+    /// probably not an actual domain.
+    PunycodeConversionFailed,
     /// Tried to send a secure request (ie. the url started with
     /// `https://`), but the crate's `https` feature was not enabled,
     /// and as such, a connection cannot be made.
@@ -38,10 +42,6 @@ pub enum Error {
     /// characters, but it could not be converted into punycode
     /// because the `punycode` feature was not enabled.
     PunycodeFeatureNotEnabled,
-    /// The provided url contained a domain that has non-ASCII
-    /// characters, and could not be converted into punycode. It is
-    /// probably not an actual domain.
-    PunycodeConversionFailed,
 
     /// This is a special error case, one that should never be
     /// returned! Think of this as a cleaner alternative to calling
