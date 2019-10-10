@@ -40,12 +40,13 @@
 //! ## Get
 //! ```no_run
 //! // This is a simple example of sending a GET request and
-//! // printing out the response. The unwrap is needed because
-//! // the server could return invalid UTF-8.
-//! if let Ok(response) = minreq::get("http://httpbin.org/ip").send() {
-//!     println!("{}", response.as_str().unwrap());
-//! }
-//!
+//! // printing out the response. The `?` are needed because
+//! // the server could return invalid UTF-8, and something
+//! // could go wrong during the download.
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! let response = minreq::get("http://httpbin.org/ip").send()?;
+//! println!("{}", response.as_str()?);
+//! # Ok(()) }
 //! ```
 //! Note: you could change the `get` function to `head` or `put` or
 //! any other HTTP request method: the api is the same for all of
@@ -54,24 +55,24 @@
 //! ## Body
 //! ```no_run
 //! // To include a body, add .with_body("") before .send().
-//! if let Ok(response) = minreq::post("http://httpbin.org/post")
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! let response = minreq::post("http://httpbin.org/post")
 //!     .with_body("Pong!")
-//!     .send()
-//! {
-//!     println!("{}", response.as_str().unwrap());
-//! }
+//!     .send()?;
+//! println!("{}", response.as_str()?);
+//! # Ok(()) }
 //! ```
 //!
 //! ## Headers
 //! ```no_run
 //! // To add a header, add .with_header("Key", "Value") before .send().
-//! if let Ok(response) = minreq::get("http://httpbin.org/headers")
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! let response = minreq::get("http://httpbin.org/headers")
 //!     .with_header("Accept", "text/plain")
 //!     .with_header("X-Best-Mon", "Sylveon")
-//!     .send()
-//! {
-//!     println!("{}", response.as_str().unwrap());
-//! }
+//!     .send()?;
+//! println!("{}", response.as_str()?);
+//! # Ok(()) }
 //! ```
 //!
 //! ## Timeouts
@@ -79,12 +80,12 @@
 //! // To avoid timing out, or limit the request's response time,
 //! // use .with_timeout(n) before .send(). The given value is in seconds.
 //! // NOTE: There is no timeout by default.
-//! if let Ok(response) = minreq::post("http://httpbin.org/delay/6")
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! let response = minreq::post("http://httpbin.org/delay/6")
 //!     .with_timeout(10)
-//!     .send()
-//! {
-//!     println!("{}", response.as_str().unwrap());
-//! }
+//!     .send()?;
+//! println!("{}", response.as_str()?);
+//! # Ok(()) }
 //! ```
 //!
 //! # Timeouts
@@ -103,9 +104,7 @@
 //!   ```
 //!   Or add the following somewhere before the requests in the code.
 //!   ```
-//!   use std::env;
-//!
-//!   env::set_var("MINREQ_TIMEOUT", "8");
+//!   std::env::set_var("MINREQ_TIMEOUT", "8");
 //!   ```
 //! If the timeout is set with `with_timeout`, the environment
 //! variable will be ignored.

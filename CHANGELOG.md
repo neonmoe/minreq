@@ -8,15 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - API for loading the HTTP response body through an iterator, allowing
   for processing of the data during the download.
+  - See the `ResponseLazy` documentation for more information.
 - Error type for all the errors that this crate can run into for
   easier `?` usage and better debuggability.
 - Punycode support for non-ascii hostnames via the `punycode` feature.
 
 ### Changed
 - Update dependencies.
-- Restructure the `Response` struct: make the `body` field into a
-  `Vec<u8>` (was `String`) and remove `body_bytes`. Added `as_str()`
-  for reading the body as a string.
+- Restructure the `Response` struct:
+  - Removed `bytes` and `body_bytes`.
+  - Added `as_bytes()`, `into_bytes()`, and `as_str()` in their place.
 - Clean up the crate internals overall. **Note**: This might cause
   instability, if you're very concerned about stability, please hold
   off upgrading for a while.

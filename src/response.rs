@@ -3,6 +3,13 @@ use std::collections::HashMap;
 use std::io::{Bytes, Read};
 use std::str;
 
+#[derive(Clone, Copy, PartialEq, Debug)]
+enum StringValidityState {
+    Unchecked,
+    CheckedValid,
+    CheckedInvalid(str::Utf8Error),
+}
+
 /// An HTTP response.
 #[derive(Clone, PartialEq, Debug)]
 pub struct Response {
@@ -12,9 +19,10 @@ pub struct Response {
     pub reason_phrase: String,
     /// The headers of the response.
     pub headers: HashMap<String, String>,
-    /// The body of the response.
-    // TODO: Consider making body private and adding as_bytes and into_bytes.
-    pub body: Vec<u8>,
+
+    body: Vec<u8>,
+    // TODO: Is caching a Cell<Utf8Error> too much bloat for Response?
+    body_str_state: std::cell::Cell<StringValidityState>,
 }
 
 impl Response {
@@ -40,18 +48,24 @@ impl Response {
             reason_phrase,
             headers,
             body,
+            body_str_state: std::cell::Cell::new(StringValidityState::Unchecked),
         })
     }
 
     /// Returns a `&str` constructed from the body of the
-    /// `Response`. Shorthand for
-    /// `std::str::from_utf8(&response.body)`.
+    /// `Response`.
     ///
     /// Returns a `Result`, as it is possible that the returned bytes
     /// are not valid UTF-8: the message can be corrupted on the
     /// server's side, it could be still loading (`flush()` not yet
     /// called, for example), or the returned message could simply not
     /// be valid UTF-8.
+    ///
+    /// Implementation note: This is basically just a branch and a
+    /// `std::str::from_utf8(&response.body)` the first time you call
+    /// this, and `std::str::from_utf8_unchecked(&response.body)`
+    /// after that: the UTF-8 validity is cached within the
+    /// `Response`.
     ///
     /// Usage:
     /// ```no_run
@@ -63,10 +77,56 @@ impl Response {
     /// # }
     /// ```
     pub fn as_str(&self) -> Result<&str, Error> {
-        match str::from_utf8(&self.body) {
-            Ok(s) => Ok(s),
-            Err(err) => Err(Error::InvalidUtf8InBody(err)),
+        use StringValidityState::*;
+        match self.body_str_state.get() {
+            Unchecked => match str::from_utf8(&self.body) {
+                Ok(s) => {
+                    self.body_str_state.set(CheckedValid);
+                    Ok(s)
+                }
+                Err(err) => {
+                    self.body_str_state.set(CheckedInvalid(err));
+                    Err(Error::InvalidUtf8InBody(err))
+                }
+            },
+            CheckedValid => unsafe { Ok(str::from_utf8_unchecked(&self.body)) },
+            CheckedInvalid(err) => Err(Error::InvalidUtf8InBody(err)),
         }
+    }
+
+    /// Returns a reference to the contained bytes. If you want the
+    /// `Vec<u8>` itself, use [`into_bytes()`](#method.into_bytes)
+    /// instead.
+    ///
+    /// Usage:
+    /// ```no_run
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let url = "http://example.org/";
+    /// let response = minreq::get(url).send()?;
+    /// println!("{:?}", response.as_bytes());
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.body
+    }
+
+    /// Turns the `Response` into the inner `Vec<u8>`. If you just
+    /// need a `&[u8]`, use [`as_bytes()`](#method.as_bytes) instead.
+    ///
+    /// Usage:
+    /// ```no_run
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let url = "http://example.org/";
+    /// let response = minreq::get(url).send()?;
+    /// println!("{:?}", response.into_bytes());
+    /// // This would error, as into_bytes consumes the Response:
+    /// // println!("{:?}", response.headers.get("Content-Type"));
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn into_bytes(self) -> Vec<u8> {
+        self.body
     }
 
     /// Converts JSON body to a `struct` using Serde.
@@ -109,27 +169,33 @@ impl Response {
 
 /// An HTTP response, which is loaded lazily.
 ///
-/// In practice, this means that the bytes are only loaded as you
-/// iterate through them. The bytes are provided in the form of a
-/// `Result<(u8, usize), minreq::Error>`, as the reading operation can
-/// fail in various ways. The `u8` is the actual byte that was read,
-/// and `usize` is how many bytes we are expecting to read in the
-/// future (including this byte). Note, however, that the `usize` can
-/// change, particularly when the `Transfer-Encoding` is `chunked`:
-/// then it will reflect how many bytes are left of the current chunk.
+/// In comparison to [`Response`](struct.Response.html), this is
+/// returned from
+/// [`send_lazy()`](struct.Request.html#method.send_lazy), where as
+/// [`Response`](struct.Response.html) is returned from
+/// [`send()`](struct.Request.html#method.send).
+///
+/// In practice, "lazy loading" means that the bytes are only loaded
+/// as you iterate through them. The bytes are provided in the form of
+/// a `Result<(u8, usize), minreq::Error>`, as the reading operation
+/// can fail in various ways. The `u8` is the actual byte that was
+/// read, and `usize` is how many bytes we are expecting to read in
+/// the future (including this byte). Note, however, that the `usize`
+/// can change, particularly when the `Transfer-Encoding` is
+/// `chunked`: then it will reflect how many bytes are left of the
+/// current chunk.
 ///
 /// # Example
 /// ```no_run
-/// // This is pretty much how the normal Response works,
-/// // implemented with a ResponseLazy.
+/// // This is how the normal Response works behind the scenes, and
+/// // how you might use ResponseLazy.
 /// # fn main() -> Result<(), minreq::Error> {
-/// if let Ok(response) = minreq::get("http://httpbin.org/ip").send_lazy() {
-///     let mut vec = Vec::new();
-///     for result in response {
-///         let (byte, length) = result?;
-///         vec.reserve(length);
-///         vec.push(byte);
-///     }
+/// let response = minreq::get("http://httpbin.org/ip").send_lazy()?;
+/// let mut vec = Vec::new();
+/// for result in response {
+///     let (byte, length) = result?;
+///     vec.reserve(length);
+///     vec.push(byte);
 /// }
 /// # Ok(())
 /// # }
