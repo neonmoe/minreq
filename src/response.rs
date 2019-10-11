@@ -91,8 +91,13 @@ impl Response {
                     Err(Error::InvalidUtf8InBody(err))
                 }
             },
-            CheckedValid => unsafe { Ok(str::from_utf8_unchecked(&self.body)) },
             CheckedInvalid(err) => Err(Error::InvalidUtf8InBody(err)),
+
+            // Note: this unsafe should be safe: self.body is
+            // immutable (private and not modified in library code)
+            // and this branch will only be entered after running
+            // str::from_utf8 and it returning Ok.
+            CheckedValid => unsafe { Ok(str::from_utf8_unchecked(&self.body)) },
         }
     }
 
@@ -221,9 +226,7 @@ pub struct ResponseLazy {
     pub headers: HashMap<String, String>,
 
     stream: Bytes<HttpStream>,
-    content_length: Option<usize>,
-    chunked: bool,
-    chunks_done: bool,
+    state: HttpStreamState,
 }
 
 impl ResponseLazy {
@@ -233,18 +236,15 @@ impl ResponseLazy {
             status_code,
             reason_phrase,
             headers,
-            chunked,
-            content_length,
+            state,
         } = read_metadata(&mut stream)?;
 
         Ok(ResponseLazy {
             status_code,
             reason_phrase,
             headers,
-            content_length,
             stream,
-            chunked,
-            chunks_done: false,
+            state,
         })
     }
 }
@@ -253,71 +253,112 @@ impl Iterator for ResponseLazy {
     type Item = Result<(u8, usize), Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.chunked {
-            if self.chunks_done {
-                return None;
-            }
-
-            if let Some(content_length) = self.content_length {
-                if content_length == 0 {
-                    // Get the size of the next chunk
-                    let count_line = match read_line(&mut self.stream) {
-                        Ok(line) => line,
-                        Err(err) => return Some(Err(err)),
-                    };
-                    match usize::from_str_radix(&count_line, 16) {
-                        Ok(incoming_count) => {
-                            if incoming_count == 0 {
-                                // FIXME: Trailer header handling
-                                self.chunks_done = true;
-                                return None;
-                            }
-                            self.content_length = Some(incoming_count);
-                        }
-                        Err(_) => return Some(Err(Error::MalformedChunkLength)),
-                    }
-                }
-            } else {
-                return Some(Err(Error::Other(
-                    "content length was None in a chunked transfer",
-                )));
+        use HttpStreamState::*;
+        match self.state {
+            EndOnClose => read_until_closed(&mut self.stream),
+            ContentLength(ref mut length) => read_with_content_length(&mut self.stream, length),
+            Chunked(ref mut expecting_chunks, ref mut length) => {
+                read_chunked(&mut self.stream, expecting_chunks, length)
             }
         }
+    }
+}
 
-        if let Some(content_length) = self.content_length {
-            if content_length > 0 {
-                self.content_length = Some(content_length - 1);
-
-                if let Some(byte) = self.stream.next() {
-                    match byte {
-                        Ok(byte) => {
-                            if self.chunked && content_length - 1 == 0 {
-                                // The last byte of the chunk was read, pop the trailing \r\n
-                                if let Err(err) = read_line(&mut self.stream) {
-                                    return Some(Err(err));
-                                }
-                            }
-                            return Some(Ok((byte, content_length)));
-                        }
-                        Err(err) => return Some(Err(Error::IoError(err))),
-                    }
-                }
-            }
-        } else {
-            // TODO: Check if this behaviour matches the HTTP spec
-
-            // Content-Length wasn't specified, and this is not a
-            // chunked transfer. So just keep getting the bytes until
-            // the connection ends, I guess?
-            if let Some(byte) = self.stream.next() {
-                match byte {
-                    Ok(byte) => return Some(Ok((byte, 1))),
-                    Err(err) => return Some(Err(Error::IoError(err))),
-                }
-            }
+fn read_until_closed(bytes: &mut Bytes<HttpStream>) -> Option<<ResponseLazy as Iterator>::Item> {
+    if let Some(byte) = bytes.next() {
+        match byte {
+            Ok(byte) => Some(Ok((byte, 1))),
+            Err(err) => Some(Err(Error::IoError(err))),
         }
+    } else {
         None
     }
+}
+
+fn read_with_content_length(
+    bytes: &mut Bytes<HttpStream>,
+    content_length: &mut usize,
+) -> Option<<ResponseLazy as Iterator>::Item> {
+    if *content_length > 0 {
+        *content_length -= 1;
+
+        if let Some(byte) = bytes.next() {
+            match byte {
+                Ok(byte) => return Some(Ok((byte, *content_length + 1))),
+                Err(err) => return Some(Err(Error::IoError(err))),
+            }
+        }
+    }
+    None
+}
+
+fn read_chunked(
+    bytes: &mut Bytes<HttpStream>,
+    expecting_more_chunks: &mut bool,
+    chunk_length: &mut usize,
+) -> Option<<ResponseLazy as Iterator>::Item> {
+    if !*expecting_more_chunks && *chunk_length == 0 {
+        return None;
+    }
+
+    if *chunk_length == 0 {
+        // Get the size of the next chunk
+        let length_line = match read_line(bytes) {
+            Ok(line) => line,
+            Err(err) => return Some(Err(err)),
+        };
+        match usize::from_str_radix(&length_line, 16) {
+            Ok(incoming_length) => {
+                if incoming_length == 0 {
+                    // FIXME: Trailer header handling
+                    *expecting_more_chunks = false;
+                    return None;
+                }
+                *chunk_length = incoming_length;
+            }
+            Err(_) => return Some(Err(Error::MalformedChunkLength)),
+        }
+    }
+
+    if *chunk_length > 0 {
+        *chunk_length -= 1;
+        if let Some(byte) = bytes.next() {
+            match byte {
+                Ok(byte) => {
+                    // If we're at the end of the chunk...
+                    if *chunk_length == 0 {
+                        //...read the trailing \r\n of the chunk, and
+                        // possibly return an error instead.
+
+                        // TODO: Maybe this could be written in a way
+                        // that doesn't discard the last ok byte if
+                        // the \r\n reading fails?
+                        if let Err(err) = read_line(bytes) {
+                            return Some(Err(err));
+                        }
+                    }
+
+                    return Some(Ok((byte, *chunk_length + 1)));
+                }
+                Err(err) => return Some(Err(Error::IoError(err))),
+            }
+        }
+    }
+
+    None
+}
+
+enum HttpStreamState {
+    // No Content-Length, and Transfer-Encoding != chunked, so we just
+    // read unti lthe server closes the connection (this should be the
+    // fallback, if I read the rfc right).
+    EndOnClose,
+    // Content-Length was specified, read that amount of bytes
+    ContentLength(usize),
+    // Transfer-Encoding == chunked, so we need to save two pieces of
+    // information: are we expecting more chunks, and how much is
+    // there left of the current chunk?
+    Chunked(bool, usize),
 }
 
 // This struct is just used in the Response and ResponseLazy
@@ -328,17 +369,13 @@ struct ResponseMetadata {
     status_code: i32,
     reason_phrase: String,
     headers: HashMap<String, String>,
-    chunked: bool,
-    content_length: Option<usize>,
+    state: HttpStreamState,
 }
 
 fn read_metadata(stream: &mut Bytes<HttpStream>) -> Result<ResponseMetadata, Error> {
     let (status_code, reason_phrase) = parse_status_line(read_line(stream)?);
-    let mut headers = HashMap::new();
-    let mut chunked = false;
-    let mut content_length = None;
 
-    // Read headers
+    let mut headers = HashMap::new();
     loop {
         let line = read_line(stream)?;
         if line.is_empty() {
@@ -346,29 +383,42 @@ fn read_metadata(stream: &mut Bytes<HttpStream>) -> Result<ResponseMetadata, Err
             break;
         }
         if let Some(header) = parse_header(line) {
-            if !chunked
-                && header.0.to_lowercase().trim() == "transfer-encoding"
-                && header.1.to_lowercase().trim() == "chunked"
-            {
-                chunked = true;
-                content_length = Some(0);
-            }
-            if content_length.is_none() && header.0.to_lowercase().trim() == "content-length" {
-                match str::parse::<usize>(&header.1.trim()) {
-                    Ok(length) => content_length = Some(length),
-                    Err(_) => return Err(Error::MalformedContentLength),
-                }
-            }
             headers.insert(header.0, header.1);
         }
     }
+
+    let mut chunked = false;
+    let mut content_length = None;
+    for (header, value) in &headers {
+        // Handle the Transfer-Encoding header
+        if header.to_lowercase().trim() == "transfer-encoding"
+            && value.to_lowercase().trim() == "chunked"
+        {
+            chunked = true;
+        }
+
+        // Handle the Content-Length header
+        if header.to_lowercase().trim() == "content-length" {
+            match str::parse::<usize>(value.trim()) {
+                Ok(length) => content_length = Some(length),
+                Err(_) => return Err(Error::MalformedContentLength),
+            }
+        }
+    }
+
+    let state = if chunked {
+        HttpStreamState::Chunked(true, 0)
+    } else if let Some(length) = content_length {
+        HttpStreamState::ContentLength(length)
+    } else {
+        HttpStreamState::EndOnClose
+    };
 
     Ok(ResponseMetadata {
         status_code,
         reason_phrase,
         headers,
-        chunked,
-        content_length,
+        state,
     })
 }
 
