@@ -202,7 +202,9 @@ fn read_from_stream<T: Read>(stream: T, head: bool) -> Result<Vec<u8>, Error> {
                         }
                     }
                 } else if let Some((key, value)) = http::parse_header(new_response_length_str) {
-                    if key.trim() == "Transfer-Encoding" && value.trim() == "chunked" {
+                    if key.to_lowercase().trim() == "transfer-encoding"
+                        && value.to_lowercase().trim() == "chunked"
+                    {
                         chunked = true;
                     }
                 }
