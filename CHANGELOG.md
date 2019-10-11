@@ -14,6 +14,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Punycode support for non-ascii hostnames via the `punycode` feature.
 
 ### Changed
+- **Breaking, will cause problems not detectable by the compiler:**
+  Response headers' field names are now in lowercase, as they are
+  case-insensitive and this makes getting header values easier. The
+  values are unaffected. So if your code has
+  `response.headers.get("Content-Type")`, you have to change it to
+  `response.headers.get("content-type")`, or it will not return what
+  you want.
 - Update dependencies.
 - Restructure the `Response` struct:
   - Removed `bytes` and `body_bytes`.

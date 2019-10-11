@@ -257,8 +257,14 @@ impl Iterator for ResponseLazy {
         match self.state {
             EndOnClose => read_until_closed(&mut self.stream),
             ContentLength(ref mut length) => read_with_content_length(&mut self.stream, length),
-            Chunked(ref mut expecting_chunks, ref mut length) => {
-                read_chunked(&mut self.stream, expecting_chunks, length)
+            Chunked(ref mut expecting_chunks, ref mut length, ref mut content_length) => {
+                read_chunked(
+                    &mut self.stream,
+                    &mut self.headers,
+                    expecting_chunks,
+                    length,
+                    content_length,
+                )
             }
         }
     }
@@ -292,10 +298,27 @@ fn read_with_content_length(
     None
 }
 
+fn read_trailers(
+    bytes: &mut Bytes<HttpStream>,
+    headers: &mut HashMap<String, String>,
+) -> Result<(), Error> {
+    loop {
+        let trailer_line = read_line(bytes)?;
+        if let Some((header, value)) = parse_header(trailer_line) {
+            headers.insert(header, value);
+        } else {
+            break;
+        }
+    }
+    Ok(())
+}
+
 fn read_chunked(
     bytes: &mut Bytes<HttpStream>,
+    headers: &mut HashMap<String, String>,
     expecting_more_chunks: &mut bool,
     chunk_length: &mut usize,
+    content_length: &mut usize,
 ) -> Option<<ResponseLazy as Iterator>::Item> {
     if !*expecting_more_chunks && *chunk_length == 0 {
         return None;
@@ -310,11 +333,17 @@ fn read_chunked(
         match usize::from_str_radix(&length_line, 16) {
             Ok(incoming_length) => {
                 if incoming_length == 0 {
-                    // FIXME: Trailer header handling
+                    if let Err(err) = read_trailers(bytes, headers) {
+                        return Some(Err(err));
+                    }
+
                     *expecting_more_chunks = false;
+                    headers.insert("content-length".to_string(), (*content_length).to_string());
+                    headers.remove("transfer-encoding");
                     return None;
                 }
                 *chunk_length = incoming_length;
+                *content_length += incoming_length;
             }
             Err(_) => return Some(Err(Error::MalformedChunkLength)),
         }
@@ -356,9 +385,11 @@ enum HttpStreamState {
     // Content-Length was specified, read that amount of bytes
     ContentLength(usize),
     // Transfer-Encoding == chunked, so we need to save two pieces of
-    // information: are we expecting more chunks, and how much is
-    // there left of the current chunk?
-    Chunked(bool, usize),
+    // information: are we expecting more chunks, how much is there
+    // left of the current chunk, and how much have we read? The last
+    // number is needed in order to provide an accurate Content-Length
+    // header after loading all the bytes.
+    Chunked(bool, usize, usize),
 }
 
 // This struct is just used in the Response and ResponseLazy
@@ -407,7 +438,7 @@ fn read_metadata(stream: &mut Bytes<HttpStream>) -> Result<ResponseMetadata, Err
     }
 
     let state = if chunked {
-        HttpStreamState::Chunked(true, 0)
+        HttpStreamState::Chunked(true, 0, 0)
     } else if let Some(length) = content_length {
         HttpStreamState::ContentLength(length)
     } else {
@@ -462,6 +493,8 @@ fn parse_header(mut line: String) -> Option<(String, String)> {
     if let Some(location) = line.find(':') {
         let value = line.split_off(location + 2);
         line.truncate(location);
+        // Headers should be ascii, I'm pretty sure. If not, please open an issue.
+        line.make_ascii_lowercase();
         return Some((line, value));
     }
     None
