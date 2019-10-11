@@ -250,11 +250,13 @@ impl Request {
         self.resource = resource;
         self.https = https;
 
+        let is_this_url = |(https_, host_, resource_): &(bool, URL, URL)| {
+            *resource_ == self.resource && *host_ == self.host && *https_ == https
+        };
+
         if self.redirects.len() > self.max_redirects {
             Err(Error::TooManyRedirections)
-        } else if self.redirects.iter().any(|(https_, host_, resource_)| {
-            *resource_ == self.resource && *host_ == self.host && *https_ == https
-        }) {
+        } else if self.redirects.iter().any(is_this_url) {
             Err(Error::InfiniteRedirectionLoop)
         } else {
             Ok(self)

@@ -28,7 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   should actually ever cause a panic now.
 
 ### Fixed
-- Test on Windows by changing the ip in tests from `0.0.0.0` to
+- Tests on Windows by changing the ip in tests from `0.0.0.0` to
   `localhost`.
 
 ### Removed

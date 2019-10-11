@@ -341,7 +341,7 @@ fn read_metadata(stream: &mut Bytes<HttpStream>) -> Result<ResponseMetadata, Err
     // Read headers
     loop {
         let line = read_line(stream)?;
-        if line.len() == 0 {
+        if line.is_empty() {
             // Body starts here
             break;
         }

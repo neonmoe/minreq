@@ -30,7 +30,7 @@ type SecuredStream = StreamOwned<ClientSession, TcpStream>;
 pub(crate) enum HttpStream {
     Unsecured(UnsecuredStream),
     #[cfg(feature = "https")]
-    Secured(SecuredStream),
+    Secured(Box<SecuredStream>),
 }
 
 impl HttpStream {
@@ -40,7 +40,7 @@ impl HttpStream {
 
     #[cfg(feature = "https")]
     fn create_secured(reader: SecuredStream) -> HttpStream {
-        HttpStream::Secured(reader)
+        HttpStream::Secured(Box::new(reader))
     }
 }
 
@@ -84,7 +84,7 @@ impl Connection {
 
         // Rustls setup
         let dns_name = &self.request.host;
-        let dns_name = dns_name.split(":").next().unwrap();
+        let dns_name = dns_name.split(':').next().unwrap();
         let dns_name = DNSNameRef::try_from_ascii_str(dns_name).unwrap();
         let sess = ClientSession::new(&CONFIG, dns_name);
 
