@@ -240,7 +240,7 @@ fn get_response_length(response: &str) -> usize {
     let mut byte_count = 0;
     for line in response.lines() {
         byte_count += line.len() + 2;
-        if line.starts_with("Content-Length: ") {
+        if line.to_lowercase().starts_with("content-length: ") {
             if let Ok(length) = line[16..].parse::<usize>() {
                 byte_count += length;
             }
