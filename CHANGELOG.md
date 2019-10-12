@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Error type for all the errors that this crate can run into for
   easier `?` usage and better debuggability.
 - Punycode support for non-ascii hostnames via the `punycode` feature.
+- Trailer header support.
 
 ### Changed
 - **Breaking, will cause problems not detectable by the compiler:**
@@ -31,7 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Remove `panic!` when trying to make an `https://` request without
   the `https` feature. The request will now return an error
   instead. The library should not panic anymore.
-- Audit the remaining `unwrap()`s from library code, none of them 
+- Audit the remaining `unwrap()`s from library code, none of them
   should actually ever cause a panic now.
 
 ### Fixed
