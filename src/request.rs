@@ -93,6 +93,7 @@ impl Request {
     }
 
     /// Sets the request body.
+    // TODO: Vec<u8> bodies
     pub fn with_body<T: Into<String>>(mut self, body: T) -> Request {
         let body = body.into();
         let body_length = body.len();

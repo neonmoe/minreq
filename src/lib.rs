@@ -50,23 +50,30 @@
 //! # Examples
 //!
 //! ## Get
+//!
+//! This is a simple example of sending a GET request and printing out
+//! the response's body and status code (and the reason phrase). The
+//! `?` are needed because the server could return invalid UTF-8, and
+//! something could go wrong during the download.
+//!
 //! ```no_run
-//! // This is a simple example of sending a GET request and
-//! // printing out the response. The `?` are needed because
-//! // the server could return invalid UTF-8, and something
-//! // could go wrong during the download.
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let response = minreq::get("http://httpbin.org/ip").send()?;
-//! println!("{}", response.as_str()?);
+//! println!("Body: {}", response.as_str()?);
+//! println!("Status: {} {}", response.status_code, response.reason_phrase);
 //! # Ok(()) }
 //! ```
+//!
 //! Note: you could change the `get` function to `head` or `put` or
 //! any other HTTP request method: the api is the same for all of
 //! them, it just changes what is sent to the server.
 //!
-//! ## Body
+//! ## Body (sending)
+//!
+//! To include a body, add `with_body("<body contents>")` before
+//! `send()`.
+//!
 //! ```no_run
-//! // To include a body, add .with_body("") before .send().
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let response = minreq::post("http://httpbin.org/post")
 //!     .with_body("Pong!")
@@ -75,9 +82,12 @@
 //! # Ok(()) }
 //! ```
 //!
-//! ## Headers
+//! ## Headers (sending)
+//!
+//! To add a header, add `with_header("Key", "Value")` before
+//! `send()`.
+//!
 //! ```no_run
-//! // To add a header, add .with_header("Key", "Value") before .send().
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let response = minreq::get("http://httpbin.org/headers")
 //!     .with_header("Accept", "text/plain")
@@ -87,11 +97,28 @@
 //! # Ok(()) }
 //! ```
 //!
-//! ## Timeouts
+//! ## Headers (receiving)
+//!
+//! Reading the headers sent by the servers is done via the
+//! [`headers`](struct.Response.html#structfield.headers) field of the
+//! [`Response`](struct.Response.html). Note: the header field names
+//! (that is, the *keys* of the `HashMap`) are all lowercase: this is
+//! because the names are case-insensitive according to the spec, and
+//! this unifies the casings for easier `get()`ing.
+//!
 //! ```no_run
-//! // To avoid timing out, or limit the request's response time,
-//! // use .with_timeout(n) before .send(). The given value is in seconds.
-//! // NOTE: There is no timeout by default.
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! let response = minreq::get("http://httpbin.org/ip").send()?;
+//! println!("{:?}", response.headers.get("content-type")); // Some("application/json")
+//! # Ok(()) }
+//! ```
+//!
+//! ## Timeouts
+//! To avoid timing out, or limit the request's response time, use
+//! `with_timeout(n)` before `send()`. The given value is in seconds.
+//!
+//! NOTE: There is no timeout by default.
+//! ```no_run
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let response = minreq::post("http://httpbin.org/delay/6")
 //!     .with_timeout(10)

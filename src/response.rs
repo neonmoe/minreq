@@ -17,11 +17,11 @@ pub struct Response {
     pub status_code: i32,
     /// The reason phrase of the response, eg. "Not Found".
     pub reason_phrase: String,
-    /// The headers of the response.
+    /// The headers of the response. The header field names (the
+    /// keys) are all lowercase.
     pub headers: HashMap<String, String>,
 
     body: Vec<u8>,
-    // TODO: Is caching a Cell<Utf8Error> too much bloat for Response?
     body_str_state: std::cell::Cell<StringValidityState>,
 }
 
@@ -222,7 +222,8 @@ pub struct ResponseLazy {
     pub status_code: i32,
     /// The reason phrase of the response, eg. "Not Found".
     pub reason_phrase: String,
-    /// The headers of the response.
+    /// The headers of the response. The header field names (the
+    /// keys) are all lowercase.
     pub headers: HashMap<String, String>,
 
     stream: Bytes<HttpStream>,
