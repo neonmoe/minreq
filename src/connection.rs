@@ -138,7 +138,7 @@ impl Connection {
 
 fn handle_redirects(connection: Connection, response: ResponseLazy) -> Result<ResponseLazy, Error> {
     let status_code = response.status_code;
-    let url = response.headers.get("Location");
+    let url = response.headers.get("location");
     if let Some(request) = get_redirect(connection, status_code, url) {
         request?.send_lazy()
     } else {
