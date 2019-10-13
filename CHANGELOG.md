@@ -4,13 +4,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.4.1] - 2019-10-13
 ### Changed
-- Updated dependencies
+- Updated dependencies.
 
 ### Fixed
-- Changed ip in tests from `0.0.0.0` to `localhost` to fix them
-  running on Windows.
+- Tests on Windows by changing the ip in tests from `0.0.0.0` to
+  `localhost`.
+- Reuse `rustls::ClientConfig` between requests.
+- `Content-Length` and `Transfer-Encoding` detection failing because
+  of case-sensitiveness.
 
 ## [1.4.0] - 2019-07-13
 ### Added
