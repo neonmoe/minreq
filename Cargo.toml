@@ -18,11 +18,11 @@ maintenance = { status = "passively-maintained" }
 
 [dependencies]
 rustls = { version = "^0.16.0", optional = true }
-webpki-roots = { version = "^0.17.0", optional = true }
+webpki-roots = { version = "^0.18.0", optional = true }
 webpki = { version = "^0.21.0", optional = true }
 lazy_static = { version = "^1.4.0", optional = true }
 serde = { version = "^1.0.101", optional = true }
-serde_json = { version = "^1.0.40", optional = true }
+serde_json = { version = "^1.0.41", optional = true }
 
 [dev-dependencies]
 tiny_http = "^0.6.2"

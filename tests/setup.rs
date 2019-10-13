@@ -3,11 +3,11 @@ extern crate tiny_http;
 use self::tiny_http::{Header, Method, Response, Server};
 use std::io::Error;
 use std::sync::Arc;
-use std::sync::{Once, ONCE_INIT};
+use std::sync::Once;
 use std::thread;
 use std::time::Duration;
 
-static INIT: Once = ONCE_INIT;
+static INIT: Once = Once::new();
 
 pub fn setup() {
     INIT.call_once(|| {
