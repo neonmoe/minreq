@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   easier `?` usage and better debuggability.
 - Punycode support for non-ascii hostnames via the `punycode` feature.
 - Trailer header support.
+- Examples [`hello`](examples/hello.rs),
+  [`iterator`](examples/iterator.rs), and [`json`](examples/json.rs).
 
 ### Changed
 - **Breaking, will cause problems not detectable by the compiler:**
@@ -34,6 +36,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   instead. The library should not panic anymore.
 - Audit the remaining `unwrap()`s from library code, none of them
   should actually ever cause a panic now.
+- Changed the `with_body` parameter type to `Into<Vec<u8>>` from
+  `Into<String>`.
+  - `String`s implement `Into<Vec<u8>>`, so this shouldn't cause any
+    problems, unless you're using some interesting types that
+    implement `Into<String>` but not `Into<Vec<u8>>`.
 
 ### Fixed
 - Tests on Windows by changing the ip in tests from `0.0.0.0` to

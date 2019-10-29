@@ -34,3 +34,13 @@ default = []
 
 https = ["rustls", "webpki-roots", "webpki", "lazy_static"]
 json-using-serde = ["serde", "serde_json"]
+
+[[example]]
+name = "hello"
+
+[[example]]
+name = "iterator"
+
+[[example]]
+name = "json"
+required-features = ["json-using-serde"]

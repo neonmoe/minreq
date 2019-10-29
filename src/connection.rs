@@ -80,7 +80,7 @@ impl Connection {
     #[cfg(feature = "https")]
     pub(crate) fn send_https(mut self) -> Result<ResponseLazy, Error> {
         self.request.host = ensure_ascii_host(self.request.host)?;
-        let bytes = self.request.to_string().into_bytes();
+        let bytes = self.request.as_bytes();
 
         // Rustls setup
         let dns_name = &self.request.host;
@@ -108,7 +108,7 @@ impl Connection {
     /// connection, and returns a [`Response`](struct.Response.html).
     pub(crate) fn send(mut self) -> Result<ResponseLazy, Error> {
         self.request.host = ensure_ascii_host(self.request.host)?;
-        let bytes = self.request.to_string().into_bytes();
+        let bytes = self.request.as_bytes();
 
         let tcp = match create_tcp_stream(&self.request.host, self.timeout) {
             Ok(tcp) => tcp,

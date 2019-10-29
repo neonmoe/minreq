@@ -58,7 +58,7 @@ pub struct Request {
     pub(crate) host: URL,
     resource: URL,
     headers: HashMap<String, String>,
-    body: Option<String>,
+    body: Option<Vec<u8>>,
     pub(crate) timeout: Option<u64>,
     max_redirects: usize,
     https: bool,
@@ -93,8 +93,7 @@ impl Request {
     }
 
     /// Sets the request body.
-    // TODO: Vec<u8> bodies
-    pub fn with_body<T: Into<String>>(mut self, body: T) -> Request {
+    pub fn with_body<T: Into<Vec<u8>>>(mut self, body: T) -> Request {
         let body = body.into();
         let body_length = body.len();
         self.body = Some(body);
@@ -221,10 +220,8 @@ impl Request {
         }
     }
 
-    /// Returns the HTTP request as a `String`, ready to be sent to
-    /// the server.
-    pub(crate) fn to_string(&self) -> String {
-        let mut http = String::new();
+    fn get_http_head(&self) -> String {
+        let mut http = String::with_capacity(32);
         // Add the request line and the "Host" header
         http += &format!(
             "{} {} HTTP/1.1\r\nHost: {}\r\n",
@@ -234,12 +231,18 @@ impl Request {
         for (k, v) in &self.headers {
             http += &format!("{}: {}\r\n", k, v);
         }
-        // Add the body
         http += "\r\n";
-        if let Some(ref body) = &self.body {
-            http += body;
-        }
         http
+    }
+
+    /// Returns the HTTP request as bytes, ready to be sent to
+    /// the server.
+    pub(crate) fn as_bytes(&self) -> Vec<u8> {
+        let mut head = self.get_http_head().into_bytes();
+        if let Some(body) = &self.body {
+            head.extend(body);
+        }
+        head
     }
 
     /// Returns the redirected version of this Request, unless an infinite redirection loop was detected.
