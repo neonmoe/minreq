@@ -479,7 +479,7 @@ fn read_line(stream: &mut Bytes<HttpStream>) -> Result<String, Error> {
 }
 
 fn parse_status_line(line: String) -> (i32, String) {
-    let mut split = line.split(' ');
+    let mut split = line.splitn(3, ' ');
     if let Some(code) = split.nth(1) {
         if let Ok(code) = code.parse::<i32>() {
             if let Some(reason) = split.next() {

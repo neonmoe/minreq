@@ -160,3 +160,11 @@ fn test_patch() {
     let body = get_body(minreq::patch(url("/i")).with_body("O").send());
     assert_eq!(body, "r: O");
 }
+
+#[test]
+fn test_status_line() -> Result<(), minreq::Error> {
+    let resp = minreq::get("http://httpbin.org/status/404").send()?;
+    assert_eq!(resp.status_code, 404);
+    assert_eq!(resp.reason_phrase, "NOT FOUND");
+    Ok(())
+}
