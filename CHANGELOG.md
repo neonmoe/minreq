@@ -4,6 +4,46 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+### Added
+- API for loading the HTTP response body through an iterator, allowing
+  for processing of the data during the download.
+  - See the `ResponseLazy` documentation for more information.
+- Error type for all the errors that this crate can run into for
+  easier `?` usage and better debuggability.
+- Punycode support for non-ascii hostnames via the `punycode` feature.
+- Trailer header support.
+- Examples [`hello`](examples/hello.rs),
+  [`iterator`](examples/iterator.rs), and [`json`](examples/json.rs).
+
+### Changed
+- **Breaking, will cause problems not detectable by the compiler:**
+  Response headers' field names are now in lowercase, as they are
+  case-insensitive and this makes getting header values easier. The
+  values are unaffected. So if your code has
+  `response.headers.get("Content-Type")`, you have to change it to
+  `response.headers.get("content-type")`, or it will not return what
+  you want.
+- **Breaking**: Restructure the `Response` struct:
+  - Removed `bytes` and `body_bytes`.
+  - Added `as_bytes()`, `into_bytes()`, and `as_str()` in their place.
+- **Breaking**: Changed the `with_body` parameter type to
+  `Into<Vec<u8>>` from `Into<String>`.
+  - `String`s implement `Into<Vec<u8>>`, so this shouldn't cause any
+    problems, unless you're using some interesting types that
+    implement `Into<String>` but not `Into<Vec<u8>>`.
+- Clean up the crate internals overall. **Note**: This might cause
+  instability, if you're very concerned about stability, please hold
+  off upgrading for a while.
+- Remove `panic!` when trying to make an `https://` request without
+  the `https` feature. The request will now return an error
+  instead. The library should not panic anymore.
+- Audit the remaining `unwrap()`s from library code, none of them
+  should actually ever cause a panic now.
+
+### Removed
+- `create_request` in favor of just using `Response::new`.
+
 ## [1.4.1] - 2019-10-13
 ### Changed
 - Updated dependencies.

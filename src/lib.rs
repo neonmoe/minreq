@@ -6,81 +6,137 @@
 //! # Additional features
 //!
 //! Since the crate is supposed to be minimal in terms of
-//! dependencies, optional functionality can be enabled by specifying
-//! features for `minreq` dependency in `Cargo.toml`:
+//! dependencies, there are no default features, and optional
+//! functionality can be enabled by specifying features for `minreq`
+//! dependency in `Cargo.toml`:
 //!
 //! ```toml
 //! [dependencies]
-//! minreq = { version = "*", features = ["https", "json-using-serde"] }
+//! minreq = { version = "*", features = ["https", "json-using-serde", "punycode"] }
 //! ```
 //!
 //! Below is the list of all available features.
 //!
 //! ## `https`
 //!
-//! This feature uses the (very good) [`rustls`](https://crates.io/crates/rustls)
-//! crate to secure connection.
+//! This feature uses the (very good)
+//! [`rustls`](https://crates.io/crates/rustls) crate to secure the
+//! connection when needed. Note that if this feature is not enabled
+//! (and it is not by default), requests to urls that start with
+//! `https://` will fail and return a
+//! [`HttpsFeatureNotEnabled`](enum.Error.html#variant.HttpsFeatureNotEnabled)
+//! error.
 //!
 //! ## `json-using-serde`
 //!
-//! This feature allows both serialize and deserialize JSON payload using
-//! [`serde_json`](https://crates.io/crates/serde_json) crate.
+//! This feature allows both serialize and deserialize JSON payload
+//! using the [`serde_json`](https://crates.io/crates/serde_json)
+//! crate.
 //!
-//! `Request` and `Response` expose `with_json()` and `json()` respectively
-//! for converting struct to JSON and back.
+//! [`Request`](struct.Request.html) and
+//! [`Response`](struct.Response.html) expose
+//! [`with_json()`](struct.Request.html#method.with_json) and
+//! [`json()`](struct.Response.html#method.json) for constructing the
+//! struct from JSON and extracting the JSON body out, respectively.
+//!
+//! ## `punycode`
+//!
+//! This feature enables requests to non-ascii domains: the
+//! [`punycode`](https://crates.io/crates/punycode) crate is used to
+//! convert the non-ascii parts into their punycode representations
+//! before making the request. If you try to make a request to 㯙㯜㯙
+//! 㯟.net or i❤.ws for example, with this feature disabled (as it is
+//! by default), your request will fail with a
+//! [`PunycodeFeatureNotEnabled`](enum.Error.html#variant.PunycodeFeatureNotEnabled)
+//! error.
 //!
 //! # Examples
 //!
 //! ## Get
-//! ```no_run
-//! // This is a simple example of sending a GET request and
-//! // printing out the response.
-//! if let Ok(response) = minreq::get("http://httpbin.org/ip").send() {
-//!     println!("{}", response.body);
-//! }
+//!
+//! This is a simple example of sending a GET request and printing out
+//! the response's body, status code, and reason phrase. The `?` are
+//! needed because the server could return invalid UTF-8 in the body,
+//! or something could go wrong during the download.
+//!
+//! ```
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! let response = minreq::get("http://httpbin.org/ip").send()?;
+//! assert!(response.as_str()?.contains("\"origin\":"));
+//! assert_eq!(response.status_code, 200);
+//! assert_eq!(response.reason_phrase, "OK");
+//! # Ok(()) }
 //! ```
 //!
-//! ## Body
-//! ```no_run
-//! // To include a body, add .with_body("") before .send().
-//! if let Ok(response) = minreq::post("http://httpbin.org/post")
-//!     .with_body("Pong!")
-//!     .send()
-//! {
-//!     println!("{}", response.body);
-//! }
+//! Note: you could change the `get` function to `head` or `put` or
+//! any other HTTP request method: the api is the same for all of
+//! them, it just changes what is sent to the server.
+//!
+//! ## Body (sending)
+//!
+//! To include a body, add `with_body("<body contents>")` before
+//! `send()`.
+//!
+//! ```
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! let response = minreq::post("http://httpbin.org/post")
+//!     .with_body("Foobar")
+//!     .send()?;
+//! assert!(response.as_str()?.contains("Foobar"));
+//! # Ok(()) }
 //! ```
 //!
-//! ## Headers
-//! ```no_run
-//! // To add a header, add .with_header("Key", "Value") before .send().
-//! if let Ok(response) = minreq::get("http://httpbin.org/headers")
+//! ## Headers (sending)
+//!
+//! To add a header, add `with_header("Key", "Value")` before
+//! `send()`.
+//!
+//! ```
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! let response = minreq::get("http://httpbin.org/headers")
 //!     .with_header("Accept", "text/plain")
-//!     .with_header("Something", "Interesting")
-//!     .send()
-//! {
-//!     println!("{}", response.body);
-//! }
+//!     .with_header("X-Best-Mon", "Sylveon")
+//!     .send()?;
+//! let body_str = response.as_str()?;
+//! assert!(body_str.contains("\"Accept\": \"text/plain\""));
+//! assert!(body_str.contains("\"X-Best-Mon\": \"Sylveon\""));
+//! # Ok(()) }
+//! ```
+//!
+//! ## Headers (receiving)
+//!
+//! Reading the headers sent by the servers is done via the
+//! [`headers`](struct.Response.html#structfield.headers) field of the
+//! [`Response`](struct.Response.html). Note: the header field names
+//! (that is, the *keys* of the `HashMap`) are all lowercase: this is
+//! because the names are case-insensitive according to the spec, and
+//! this unifies the casings for easier `get()`ing.
+//!
+//! ```
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! let response = minreq::get("http://httpbin.org/ip").send()?;
+//! assert_eq!(response.headers.get("content-type").unwrap(), "application/json");
+//! # Ok(()) }
 //! ```
 //!
 //! ## Timeouts
+//! To avoid timing out, or limit the request's response time, use
+//! `with_timeout(n)` before `send()`. The given value is in seconds.
+//!
+//! NOTE: There is no timeout by default.
 //! ```no_run
-//! // To avoid timing out, or limit the request's response time even more,
-//! // use .with_timeout(n) before .send(). The given value is in seconds.
-//! // NOTE: There is no timeout by default.
-//! if let Ok(response) = minreq::post("http://httpbin.org/delay/6")
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! let response = minreq::post("http://httpbin.org/delay/6")
 //!     .with_timeout(10)
-//!     .send()
-//! {
-//!     println!("{}", response.body);
-//! }
+//!     .send()?;
+//! println!("{}", response.as_str()?);
+//! # Ok(()) }
 //! ```
 //!
 //! # Timeouts
 //! By default, a request has no timeout.  You can change this in two ways:
-//! - Use this function (`create_request`) and call
-//!   [`with_timeout`](struct.Request.html#method.with_timeout)
-//!   on it to set the timeout per-request like so:
+//! - Use [`with_timeout`](struct.Request.html#method.with_timeout) on
+//!   your request to set the timeout per-request like so:
 //!   ```
 //!   minreq::get("/").with_timeout(8).send();
 //!   ```
@@ -93,10 +149,10 @@
 //!   ```
 //!   Or add the following somewhere before the requests in the code.
 //!   ```
-//!   use std::env;
-//!
-//!   env::set_var("MINREQ_TIMEOUT", "8");
+//!   std::env::set_var("MINREQ_TIMEOUT", "8");
 //!   ```
+//! If the timeout is set with `with_timeout`, the environment
+//! variable will be ignored.
 
 #![deny(missing_docs)]
 
@@ -112,8 +168,10 @@ extern crate webpki;
 extern crate webpki_roots;
 
 mod connection;
-mod http;
-mod requests;
+mod error;
+mod request;
+mod response;
 
-pub use http::*;
-pub use requests::*;
+pub use error::*;
+pub use request::*;
+pub use response::*;

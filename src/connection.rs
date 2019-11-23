@@ -1,8 +1,8 @@
-use crate::{http, Request, Response};
+use crate::{Error, Method, Request, ResponseLazy};
 #[cfg(feature = "https")]
-use rustls::{self, ClientConfig, ClientSession};
+use rustls::{self, ClientConfig, ClientSession, StreamOwned};
 use std::env;
-use std::io::{BufReader, BufWriter, Error, ErrorKind, Read, Write};
+use std::io::{self, BufReader, BufWriter, Read, Write};
 use std::net::{TcpStream, ToSocketAddrs};
 #[cfg(feature = "https")]
 use std::sync::Arc;
@@ -21,6 +21,37 @@ lazy_static::lazy_static! {
             .add_server_trust_anchors(&TLS_SERVER_ROOTS);
         Arc::new(config)
     };
+}
+
+type UnsecuredStream = BufReader<TcpStream>;
+#[cfg(feature = "https")]
+type SecuredStream = StreamOwned<ClientSession, TcpStream>;
+
+pub(crate) enum HttpStream {
+    Unsecured(UnsecuredStream),
+    #[cfg(feature = "https")]
+    Secured(Box<SecuredStream>),
+}
+
+impl HttpStream {
+    fn create_unsecured(reader: UnsecuredStream) -> HttpStream {
+        HttpStream::Unsecured(reader)
+    }
+
+    #[cfg(feature = "https")]
+    fn create_secured(reader: SecuredStream) -> HttpStream {
+        HttpStream::Secured(Box::new(reader))
+    }
+}
+
+impl Read for HttpStream {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        match self {
+            HttpStream::Unsecured(inner) => inner.read(buf),
+            #[cfg(feature = "https")]
+            HttpStream::Secured(inner) => inner.read(buf),
+        }
+    }
 }
 
 /// A connection to the server for sending
@@ -47,93 +78,108 @@ impl Connection {
     /// Sends the [`Request`](struct.Request.html), consumes this
     /// connection, and returns a [`Response`](struct.Response.html).
     #[cfg(feature = "https")]
-    pub(crate) fn send_https(self) -> Result<Response, Error> {
-        let is_head = self.request.method == http::Method::Head;
-        let bytes = self.request.to_string().into_bytes();
+    pub(crate) fn send_https(mut self) -> Result<ResponseLazy, Error> {
+        self.request.host = ensure_ascii_host(self.request.host)?;
+        let bytes = self.request.as_bytes();
 
         // Rustls setup
         let dns_name = &self.request.host;
-        let dns_name = dns_name.split(":").next().unwrap();
+        let dns_name = dns_name.split(':').next().unwrap();
         let dns_name = DNSNameRef::try_from_ascii_str(dns_name).unwrap();
-        let mut sess = ClientSession::new(&CONFIG, dns_name);
+        let sess = ClientSession::new(&CONFIG, dns_name);
 
-        // IO
-        let mut stream = create_tcp_stream(&self.request.host, self.timeout)?;
-        let mut tls = rustls::Stream::new(&mut sess, &mut stream);
-        tls.write(&bytes)?;
-        match read_from_stream(tls, is_head) {
-            Ok(result) => handle_redirects(self, Response::from_bytes(result)),
-            Err(err) => Err(err),
+        let tcp = match create_tcp_stream(&self.request.host, self.timeout) {
+            Ok(tcp) => tcp,
+            Err(err) => return Err(Error::IoError(err)),
+        };
+
+        // Send request
+        let mut tls = StreamOwned::new(sess, tcp);
+        if let Err(err) = tls.write(&bytes) {
+            return Err(Error::IoError(err));
         }
+
+        // Receive request
+        let response = ResponseLazy::from_stream(HttpStream::create_secured(tls))?;
+        handle_redirects(self, response)
     }
 
     /// Sends the [`Request`](struct.Request.html), consumes this
     /// connection, and returns a [`Response`](struct.Response.html).
-    pub(crate) fn send(self) -> Result<Response, Error> {
-        let is_head = self.request.method == http::Method::Head;
-        let bytes = self.request.to_string().into_bytes();
+    pub(crate) fn send(mut self) -> Result<ResponseLazy, Error> {
+        self.request.host = ensure_ascii_host(self.request.host)?;
+        let bytes = self.request.as_bytes();
 
-        let tcp = create_tcp_stream(&self.request.host, self.timeout)?;
+        let tcp = match create_tcp_stream(&self.request.host, self.timeout) {
+            Ok(tcp) => tcp,
+            Err(err) => return Err(Error::IoError(err)),
+        };
 
         // Send request
         let mut stream = BufWriter::new(tcp);
-        stream.write_all(&bytes)?;
+        if let Err(err) = stream.write_all(&bytes) {
+            return Err(Error::IoError(err));
+        }
 
         // Receive response
-        let tcp = stream.into_inner()?;
-        let mut stream = BufReader::new(tcp);
-        match read_from_stream(&mut stream, is_head) {
-            Ok(response) => handle_redirects(self, Response::from_bytes(response)),
-            Err(err) => match err.kind() {
-                ErrorKind::WouldBlock | ErrorKind::TimedOut => Err(Error::new(
-                    ErrorKind::TimedOut,
-                    format!(
-                        "Request timed out! Timeout: {:?}",
-                        stream.get_ref().read_timeout()
-                    ),
-                )),
-                _ => Err(err),
-            },
-        }
-    }
-}
-
-fn handle_redirects(connection: Connection, response: Response) -> Result<Response, Error> {
-    let status_code = response.status_code;
-    match status_code {
-        301 | 302 | 303 | 307 => {
-            let url = response.headers.get("Location");
-            if url.is_none() {
-                return Err(Error::new(
-                    ErrorKind::Other,
-                    "'Location' header missing in redirect.",
+        let tcp = match stream.into_inner() {
+            Ok(tcp) => tcp,
+            Err(_) => {
+                return Err(Error::Other(
+                    "IntoInnerError after writing the request into the TcpStream.",
                 ));
             }
-            let url = url.unwrap();
-            let mut request = connection.request;
-
-            if request.redirects.contains(&url) {
-                Err(Error::new(ErrorKind::Other, "Infinite redirection loop."))
-            } else {
-                request.redirect_to(url.clone());
-                if status_code == 303 {
-                    match request.method {
-                        http::Method::Post | http::Method::Put | http::Method::Delete => {
-                            request.method = http::Method::Get;
-                        }
-                        _ => {}
-                    }
-                }
-
-                request.send()
-            }
-        }
-
-        _ => Ok(response),
+        };
+        let stream = HttpStream::create_unsecured(BufReader::new(tcp));
+        let response = ResponseLazy::from_stream(stream)?;
+        handle_redirects(self, response)
     }
 }
 
-fn create_tcp_stream<A>(host: A, timeout: Option<u64>) -> Result<TcpStream, Error>
+fn handle_redirects(connection: Connection, response: ResponseLazy) -> Result<ResponseLazy, Error> {
+    let status_code = response.status_code;
+    let url = response.headers.get("location");
+    if let Some(request) = get_redirect(connection, status_code, url) {
+        request?.send_lazy()
+    } else {
+        Ok(response)
+    }
+}
+
+fn get_redirect(
+    connection: Connection,
+    status_code: i32,
+    url: Option<&String>,
+) -> Option<Result<Request, Error>> {
+    match status_code {
+        301 | 302 | 303 | 307 => {
+            if url.is_none() {
+                return Some(Err(Error::RedirectLocationMissing));
+            }
+            let url = url.unwrap();
+
+            match connection.request.redirect_to(url.clone()) {
+                Ok(mut request) => {
+                    if status_code == 303 {
+                        match request.method {
+                            Method::Post | Method::Put | Method::Delete => {
+                                request.method = Method::Get;
+                            }
+                            _ => {}
+                        }
+                    }
+
+                    Some(Ok(request))
+                }
+                Err(err) => Some(Err(err)),
+            }
+        }
+
+        _ => None,
+    }
+}
+
+fn create_tcp_stream<A>(host: A, timeout: Option<u64>) -> Result<TcpStream, std::io::Error>
 where
     A: ToSocketAddrs,
 {
@@ -146,107 +192,31 @@ where
     Ok(stream)
 }
 
-/// Reads the stream until it can't or it reaches the end of the HTTP
-/// response.
-fn read_from_stream<T: Read>(stream: T, head: bool) -> Result<Vec<u8>, Error> {
-    let mut response = Vec::new();
-    let mut response_length = None;
-    let mut chunked = false;
-    let mut expecting_chunk_length = false;
-    let mut byte_count = 0;
-    let mut last_newline_index = 0;
-    let mut blank_line = false;
-    let mut status_code = None;
-
-    for byte in stream.bytes() {
-        let byte = byte?;
-        response.push(byte);
-        byte_count += 1;
-        if byte == b'\n' {
-            if status_code.is_none() {
-                // First line
-                status_code = Some(http::parse_status_line(&response).0);
-            }
-
-            if blank_line {
-                // Two consecutive blank lines, body should start here
-                if let Some(code) = status_code {
-                    if head || code / 100 == 1 || code == 204 || code == 304 {
-                        response_length = Some(response.len());
-                    }
-                }
-                if response_length.is_none() {
-                    if let Ok(response_str) = std::str::from_utf8(&response) {
-                        let len = get_response_length(response_str);
-                        response_length = Some(len);
-                        if len > response.len() {
-                            response.reserve(len - response.len());
-                        }
-                    }
-                }
-            } else if let Ok(new_response_length_str) =
-                std::str::from_utf8(&response[last_newline_index..])
-            {
-                if expecting_chunk_length {
-                    expecting_chunk_length = false;
-
-                    if let Ok(n) = usize::from_str_radix(new_response_length_str.trim(), 16) {
-                        // Cut out the chunk length from the reponse
-                        response.truncate(last_newline_index);
-                        byte_count = last_newline_index;
-                        // Update response length according to the new chunk length
-                        if n == 0 {
-                            break;
-                        } else {
-                            response_length = Some(byte_count + n + 2);
-                        }
-                    }
-                } else if let Some((key, value)) = http::parse_header(new_response_length_str) {
-                    if key.to_lowercase().trim() == "transfer-encoding"
-                        && value.to_lowercase().trim() == "chunked"
-                    {
-                        chunked = true;
-                    }
-                }
-            }
-
-            blank_line = true;
-            last_newline_index = byte_count;
-        } else if byte != b'\r' {
-            // Normal character, reset blank_line
-            blank_line = false;
+fn ensure_ascii_host(host: String) -> Result<String, Error> {
+    if host.is_ascii() {
+        Ok(host)
+    } else {
+        #[cfg(not(feature = "punycode"))]
+        {
+            Err(Error::PunycodeFeatureNotEnabled)
         }
 
-        if let Some(len) = response_length {
-            if byte_count >= len {
-                if chunked {
-                    // Transfer-Encoding is chunked, next up should be
-                    // the next chunk's length.
-                    expecting_chunk_length = true;
+        #[cfg(feature = "punycode")]
+        {
+            let mut result = String::with_capacity(host.len() * 2);
+            for s in host.split('.') {
+                if s.is_ascii() {
+                    result += s;
                 } else {
-                    // We have reached the end of the HTTP response,
-                    // break the reading loop.
-                    break;
+                    match punycode::encode(s) {
+                        Ok(s) => result = result + "xn--" + &s,
+                        Err(_) => return Err(Error::PunycodeConversionFailed),
+                    }
                 }
+                result += ".";
             }
+            result.truncate(result.len() - 1); // Remove the trailing dot
+            Ok(result)
         }
     }
-
-    Ok(response)
-}
-
-/// Tries to find out how long the whole response will eventually be,
-/// in bytes.
-fn get_response_length(response: &str) -> usize {
-    // The length of the headers
-    let mut byte_count = 0;
-    for line in response.lines() {
-        byte_count += line.len() + 2;
-        if line.to_lowercase().starts_with("content-length: ") {
-            if let Ok(length) = line[16..].parse::<usize>() {
-                byte_count += length;
-            }
-        }
-    }
-    byte_count
 }

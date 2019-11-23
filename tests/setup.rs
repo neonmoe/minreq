@@ -1,7 +1,6 @@
 extern crate minreq;
 extern crate tiny_http;
 use self::tiny_http::{Header, Method, Response, Server};
-use std::io::Error;
 use std::sync::Arc;
 use std::sync::Once;
 use std::thread;
@@ -16,14 +15,20 @@ pub fn setup() {
             let server = server.clone();
 
             thread::spawn(move || loop {
-                let mut request = server.recv().unwrap();
+                let mut request = {
+                    if let Ok(request) = server.recv() {
+                        request
+                    } else {
+                        continue; // If .recv() fails, just try again.
+                    }
+                };
                 let mut content = String::new();
                 request.as_reader().read_to_string(&mut content).ok();
                 let headers = Vec::from(request.headers());
 
                 let url = String::from(request.url());
                 match request.method() {
-                    &Method::Get if url == "/header_pong" => {
+                    Method::Get if url == "/header_pong" => {
                         for header in headers {
                             if header.field.as_str() == "Ping" {
                                 let response = Response::from_string(format!("{}", header.value));
@@ -34,29 +39,29 @@ pub fn setup() {
                         request.respond(Response::from_string("No header!")).ok();
                     }
 
-                    &Method::Get if url == "/slow_a" => {
+                    Method::Get if url == "/slow_a" => {
                         thread::sleep(Duration::from_secs(2));
                         let response = Response::from_string(format!("j: {}", content));
                         request.respond(response).ok();
                     }
 
-                    &Method::Get if url == "/a" => {
+                    Method::Get if url == "/a" => {
                         let response = Response::from_string(format!("j: {}", content));
                         request.respond(response).ok();
                     }
-                    &Method::Post if url == "/a" => {
+                    Method::Post if url == "/a" => {
                         let response = Response::from_string("POST to /a is not valid.");
                         request.respond(response).ok();
                     }
 
-                    &Method::Get if url == "/redirect" => {
+                    Method::Get if url == "/redirect" => {
                         let response = Response::empty(301).with_header(
                             Header::from_bytes(&b"Location"[..], &b"http://localhost:35562/a"[..])
                                 .unwrap(),
                         );
                         request.respond(response).ok();
                     }
-                    &Method::Post if url == "/redirect" => {
+                    Method::Post if url == "/redirect" => {
                         let response = Response::empty(303).with_header(
                             Header::from_bytes(&b"Location"[..], &b"http://localhost:35562/a"[..])
                                 .unwrap(),
@@ -64,7 +69,7 @@ pub fn setup() {
                         request.respond(response).ok();
                     }
 
-                    &Method::Get if url == "/infiniteredirect" => {
+                    Method::Get if url == "/infiniteredirect" => {
                         let response = Response::empty(301).with_header(
                             Header::from_bytes(
                                 &b"Location"[..],
@@ -74,7 +79,7 @@ pub fn setup() {
                         );
                         request.respond(response).ok();
                     }
-                    &Method::Get if url == "/redirectpong" => {
+                    Method::Get if url == "/redirectpong" => {
                         let response = Response::empty(301).with_header(
                             Header::from_bytes(
                                 &b"Location"[..],
@@ -85,38 +90,38 @@ pub fn setup() {
                         request.respond(response).ok();
                     }
 
-                    &Method::Post if url == "/echo" => {
+                    Method::Post if url == "/echo" => {
                         request.respond(Response::from_string(content)).ok();
                     }
 
-                    &Method::Head if url == "/b" => {
+                    Method::Head if url == "/b" => {
                         request.respond(Response::empty(418)).ok();
                     }
-                    &Method::Post if url == "/c" => {
+                    Method::Post if url == "/c" => {
                         let response = Response::from_string(format!("l: {}", content));
                         request.respond(response).ok();
                     }
-                    &Method::Put if url == "/d" => {
+                    Method::Put if url == "/d" => {
                         let response = Response::from_string(format!("m: {}", content));
                         request.respond(response).ok();
                     }
-                    &Method::Delete if url == "/e" => {
+                    Method::Delete if url == "/e" => {
                         let response = Response::from_string(format!("n: {}", content));
                         request.respond(response).ok();
                     }
-                    &Method::Trace if url == "/f" => {
+                    Method::Trace if url == "/f" => {
                         let response = Response::from_string(format!("o: {}", content));
                         request.respond(response).ok();
                     }
-                    &Method::Options if url == "/g" => {
+                    Method::Options if url == "/g" => {
                         let response = Response::from_string(format!("p: {}", content));
                         request.respond(response).ok();
                     }
-                    &Method::Connect if url == "/h" => {
+                    Method::Connect if url == "/h" => {
                         let response = Response::from_string(format!("q: {}", content));
                         request.respond(response).ok();
                     }
-                    &Method::Patch if url == "/i" => {
+                    Method::Patch if url == "/i" => {
                         let response = Response::from_string(format!("r: {}", content));
                         request.respond(response).ok();
                     }
@@ -136,9 +141,15 @@ pub fn url(req: &str) -> String {
     format!("http://localhost:35562{}", req)
 }
 
-pub fn get_body(request: Result<minreq::Response, Error>) -> String {
+pub fn get_body(request: Result<minreq::Response, minreq::Error>) -> String {
     match request {
-        Ok(response) => String::from(response.body),
+        Ok(response) => match response.as_str() {
+            Ok(str) => String::from(str),
+            Err(err) => {
+                println!("\n[ERROR]: {}\n", err);
+                String::new()
+            }
+        },
         Err(err) => {
             println!("\n[ERROR]: {}\n", err);
             String::new()
@@ -146,7 +157,7 @@ pub fn get_body(request: Result<minreq::Response, Error>) -> String {
     }
 }
 
-pub fn get_status_code(request: Result<minreq::Response, Error>) -> i32 {
+pub fn get_status_code(request: Result<minreq::Response, minreq::Error>) -> i32 {
     match request {
         Ok(response) => response.status_code,
         Err(err) => {
