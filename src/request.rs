@@ -52,6 +52,20 @@ impl fmt::Display for Method {
 }
 
 /// An HTTP request.
+///
+/// Generally created by the [`minreq::get`](fn.get.html)-style
+/// functions, corresponding to the HTTP method we want to use.
+///
+/// # Example
+///
+/// ```
+/// let request = minreq::post("http://example.com");
+/// ```
+///
+/// After creating the request, you would generally call
+/// [`send`](struct.Request.html#method.send) or
+/// [`send_lazy`](struct.Request.html#method.send_lazy) on it, as it
+/// doesn't do much on its own.
 #[derive(Clone, PartialEq, Debug)]
 pub struct Request {
     pub(crate) method: Method,
@@ -165,12 +179,7 @@ impl Request {
     ///
     /// # Errors
     ///
-    /// Returns `Err` if we run into an error while sending the
-    /// request, or receiving/parsing the response. The specific error
-    /// is described in the `Err`, and it can be any
-    /// [`minreq::Error`](enum.Error.html) except
-    /// [`SerdeJsonError`](enum.Error.html#variant.SerdeJsonError) and
-    /// [`InvalidUtf8InBody`](enum.Error.html#variant.InvalidUtf8InBody).
+    /// See [`send`](struct.Request.html#method.send).
     #[cfg(feature = "https")]
     pub fn send_lazy(self) -> Result<ResponseLazy, Error> {
         if self.https {
@@ -205,12 +214,7 @@ impl Request {
     ///
     /// # Errors
     ///
-    /// Returns `Err` if we run into an error while sending the
-    /// request, or receiving/parsing the response. The specific error
-    /// is described in the `Err`, and it can be any
-    /// [`minreq::Error`](enum.Error.html) except
-    /// [`SerdeJsonError`](enum.Error.html#variant.SerdeJsonError) and
-    /// [`InvalidUtf8InBody`](enum.Error.html#variant.InvalidUtf8InBody).
+    /// See [`send`](struct.Request.html#method.send).
     #[cfg(not(feature = "https"))]
     pub fn send_lazy(self) -> Result<ResponseLazy, Error> {
         if self.https {

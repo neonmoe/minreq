@@ -33,8 +33,11 @@
 //! using the [`serde_json`](https://crates.io/crates/serde_json)
 //! crate.
 //!
-//! `Request` and `Response` expose `with_json()` and `json()` respectively
-//! for converting struct to JSON and back.
+//! [`Request`](struct.Request.html) and
+//! [`Response`](struct.Response.html) expose
+//! [`with_json()`](struct.Request.html#method.with_json) and
+//! [`json()`](struct.Response.html#method.json) for constructing the
+//! struct from JSON and extracting the JSON body out, respectively.
 //!
 //! ## `punycode`
 //!
@@ -52,15 +55,16 @@
 //! ## Get
 //!
 //! This is a simple example of sending a GET request and printing out
-//! the response's body and status code (and the reason phrase). The
-//! `?` are needed because the server could return invalid UTF-8, and
-//! something could go wrong during the download.
+//! the response's body, status code, and reason phrase. The `?` are
+//! needed because the server could return invalid UTF-8 in the body,
+//! or something could go wrong during the download.
 //!
-//! ```no_run
+//! ```
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let response = minreq::get("http://httpbin.org/ip").send()?;
-//! println!("Body: {}", response.as_str()?);
-//! println!("Status: {} {}", response.status_code, response.reason_phrase);
+//! assert!(response.as_str()?.contains("\"origin\":"));
+//! assert_eq!(response.status_code, 200);
+//! assert_eq!(response.reason_phrase, "OK");
 //! # Ok(()) }
 //! ```
 //!
@@ -73,12 +77,12 @@
 //! To include a body, add `with_body("<body contents>")` before
 //! `send()`.
 //!
-//! ```no_run
+//! ```
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let response = minreq::post("http://httpbin.org/post")
-//!     .with_body("Pong!")
+//!     .with_body("Foobar")
 //!     .send()?;
-//! println!("{}", response.as_str()?);
+//! assert!(response.as_str()?.contains("Foobar"));
 //! # Ok(()) }
 //! ```
 //!
@@ -87,13 +91,15 @@
 //! To add a header, add `with_header("Key", "Value")` before
 //! `send()`.
 //!
-//! ```no_run
+//! ```
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let response = minreq::get("http://httpbin.org/headers")
 //!     .with_header("Accept", "text/plain")
 //!     .with_header("X-Best-Mon", "Sylveon")
 //!     .send()?;
-//! println!("{}", response.as_str()?);
+//! let body_str = response.as_str()?;
+//! assert!(body_str.contains("\"Accept\": \"text/plain\""));
+//! assert!(body_str.contains("\"X-Best-Mon\": \"Sylveon\""));
 //! # Ok(()) }
 //! ```
 //!
@@ -106,10 +112,10 @@
 //! because the names are case-insensitive according to the spec, and
 //! this unifies the casings for easier `get()`ing.
 //!
-//! ```no_run
+//! ```
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let response = minreq::get("http://httpbin.org/ip").send()?;
-//! println!("{:?}", response.headers.get("content-type")); // Some("application/json")
+//! assert_eq!(response.headers.get("content-type").unwrap(), "application/json");
 //! # Ok(()) }
 //! ```
 //!

@@ -3,14 +3,18 @@ use std::collections::HashMap;
 use std::io::{Bytes, Read};
 use std::str;
 
-#[derive(Clone, Copy, PartialEq, Debug)]
-enum StringValidityState {
-    Unchecked,
-    CheckedValid,
-    CheckedInvalid(str::Utf8Error),
-}
-
 /// An HTTP response.
+///
+/// Returned by [`Request::send`](struct.Request.html#method.send).
+///
+/// # Example
+///
+/// ```no_run
+/// # fn main() -> Result<(), minreq::Error> {
+/// let response = minreq::get("http://example.com").send()?;
+/// println!("{}", response.as_str()?);
+/// # Ok(()) }
+/// ```
 #[derive(Clone, PartialEq, Debug)]
 pub struct Response {
     /// The status code of the response, eg. 404.
@@ -22,7 +26,6 @@ pub struct Response {
     pub headers: HashMap<String, String>,
 
     body: Vec<u8>,
-    body_str_state: std::cell::Cell<StringValidityState>,
 }
 
 impl Response {
@@ -48,19 +51,10 @@ impl Response {
             reason_phrase,
             headers,
             body,
-            body_str_state: std::cell::Cell::new(StringValidityState::Unchecked),
         })
     }
 
     /// Returns the body as an `&str`.
-    ///
-    /// ## Implementation note
-    ///
-    /// As the body of the `Response` is never mutated, it is safe to
-    /// only check its UTF-8 validity once. Because of that, this
-    /// function might take a few microseconds the first time you call
-    /// it, but it will be practically free after that, as the result
-    /// of the check is cached within the `Response`.
     ///
     /// # Errors
     ///
@@ -70,6 +64,7 @@ impl Response {
     /// provided slice is not UTF-8.
     ///
     /// # Example
+    ///
     /// ```no_run
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let url = "http://example.org/";
@@ -79,33 +74,18 @@ impl Response {
     /// # }
     /// ```
     pub fn as_str(&self) -> Result<&str, Error> {
-        use StringValidityState::*;
-        match self.body_str_state.get() {
-            Unchecked => match str::from_utf8(&self.body) {
-                Ok(s) => {
-                    self.body_str_state.set(CheckedValid);
-                    Ok(s)
-                }
-                Err(err) => {
-                    self.body_str_state.set(CheckedInvalid(err));
-                    Err(Error::InvalidUtf8InBody(err))
-                }
-            },
-            CheckedInvalid(err) => Err(Error::InvalidUtf8InBody(err)),
-
-            // Note: this unsafe should be safe: self.body is
-            // immutable (private and not modified in library code)
-            // and this branch will only be entered after running
-            // str::from_utf8 and it returning Ok.
-            CheckedValid => unsafe { Ok(str::from_utf8_unchecked(&self.body)) },
+        match str::from_utf8(&self.body) {
+            Ok(s) => Ok(s),
+            Err(err) => Err(Error::InvalidUtf8InBody(err)),
         }
     }
 
-    /// Returns a reference to the contained bytes. If you want the
-    /// `Vec<u8>` itself, use [`into_bytes()`](#method.into_bytes)
-    /// instead.
+    /// Returns a reference to the contained bytes of the body. If you
+    /// want the `Vec<u8>` itself, use
+    /// [`into_bytes()`](#method.into_bytes) instead.
     ///
-    /// Usage:
+    /// # Example
+    ///
     /// ```no_run
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let url = "http://example.org/";
@@ -118,10 +98,12 @@ impl Response {
         &self.body
     }
 
-    /// Turns the `Response` into the inner `Vec<u8>`. If you just
-    /// need a `&[u8]`, use [`as_bytes()`](#method.as_bytes) instead.
+    /// Turns the `Response` into the inner `Vec<u8>`, the bytes that
+    /// make up the response's body. If you just need a `&[u8]`, use
+    /// [`as_bytes()`](#method.as_bytes) instead.
     ///
-    /// Usage:
+    /// # Example
+    ///
     /// ```no_run
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let url = "http://example.org/";

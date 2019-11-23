@@ -216,7 +216,6 @@ fn ensure_ascii_host(host: String) -> Result<String, Error> {
                 result += ".";
             }
             result.truncate(result.len() - 1); // Remove the trailing dot
-            println!("{}", result);
             Ok(result)
         }
     }

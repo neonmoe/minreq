@@ -24,10 +24,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `response.headers.get("Content-Type")`, you have to change it to
   `response.headers.get("content-type")`, or it will not return what
   you want.
-- Update dependencies.
-- Restructure the `Response` struct:
+- **Breaking**: Restructure the `Response` struct:
   - Removed `bytes` and `body_bytes`.
   - Added `as_bytes()`, `into_bytes()`, and `as_str()` in their place.
+- **Breaking**: Changed the `with_body` parameter type to
+  `Into<Vec<u8>>` from `Into<String>`.
+  - `String`s implement `Into<Vec<u8>>`, so this shouldn't cause any
+    problems, unless you're using some interesting types that
+    implement `Into<String>` but not `Into<Vec<u8>>`.
 - Clean up the crate internals overall. **Note**: This might cause
   instability, if you're very concerned about stability, please hold
   off upgrading for a while.
@@ -36,11 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   instead. The library should not panic anymore.
 - Audit the remaining `unwrap()`s from library code, none of them
   should actually ever cause a panic now.
-- Changed the `with_body` parameter type to `Into<Vec<u8>>` from
-  `Into<String>`.
-  - `String`s implement `Into<Vec<u8>>`, so this shouldn't cause any
-    problems, unless you're using some interesting types that
-    implement `Into<String>` but not `Into<Vec<u8>>`.
+- Update dependencies.
 
 ### Fixed
 - Tests on Windows by changing the ip in tests from `0.0.0.0` to
