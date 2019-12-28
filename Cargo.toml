@@ -1,6 +1,6 @@
 [package]
 name = "minreq"
-version = "2.0.0"
+version = "2.0.1"
 authors = ["Jens Pitkanen <jens@neon.moe>"]
 description = "Simple, minimal-dependency HTTP client"
 documentation = "https://docs.rs/minreq"
@@ -17,21 +17,30 @@ travis-ci = { repository = "neonmoe/minreq" }
 maintenance = { status = "passively-maintained" }
 
 [dependencies]
+serde = { version = "^1.0.101", optional = true }
+serde_json = { version = "^1.0.41", optional = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 rustls = { version = "^0.16.0", optional = true }
 webpki-roots = { version = "^0.18.0", optional = true }
 webpki = { version = "^0.21.0", optional = true }
 lazy_static = { version = "^1.4.0", optional = true }
-serde = { version = "^1.0.101", optional = true }
-serde_json = { version = "^1.0.41", optional = true }
 punycode = { version = "^0.4.1", optional = true }
 
-[dev-dependencies]
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+web-sys = {version= "^0.3.33", features=["Request", "RequestInit", "RequestMode", "Headers", "Window", "Response", "ReadableStream"]}
+wasm-bindgen = "^0.2.56"
+wasm-bindgen-futures = "^0.4.6"
+futures = "^0.3.1"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 tiny_http = "^0.6.2"
+
+[dev-dependencies]
 serde_derive = "^1.0.101"
 
 [features]
 default = []
-
 https = ["rustls", "webpki-roots", "webpki", "lazy_static"]
 json-using-serde = ["serde", "serde_json"]
 

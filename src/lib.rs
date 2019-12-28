@@ -157,14 +157,17 @@
 #![deny(missing_docs)]
 
 #[cfg(feature = "https")]
+#[cfg(not(target_arch = "wasm32"))]
 extern crate rustls;
 #[cfg(feature = "json-using-serde")]
 extern crate serde;
 #[cfg(feature = "json-using-serde")]
 extern crate serde_json;
 #[cfg(feature = "https")]
+#[cfg(not(target_arch = "wasm32"))]
 extern crate webpki;
 #[cfg(feature = "https")]
+#[cfg(not(target_arch = "wasm32"))]
 extern crate webpki_roots;
 
 mod connection;

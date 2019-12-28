@@ -1,5 +1,7 @@
 use crate::connection::Connection;
-use crate::{Error, Response, ResponseLazy};
+use crate::{Error, Response};
+#[cfg(not(target_arch = "wasm32"))]
+use crate::ResponseLazy;
 use std::collections::HashMap;
 use std::fmt;
 
@@ -71,8 +73,8 @@ pub struct Request {
     pub(crate) method: Method,
     pub(crate) host: URL,
     resource: URL,
-    headers: HashMap<String, String>,
-    body: Option<Vec<u8>>,
+    pub(crate) headers: HashMap<String, String>,
+    pub(crate) body: Option<Vec<u8>>,
     pub(crate) timeout: Option<u64>,
     max_redirects: usize,
     https: bool,
@@ -97,6 +99,20 @@ impl Request {
             https,
             redirects: Vec::new(),
         }
+    }
+
+    /// Return the full url
+    pub fn get_full_url(&self) -> String {
+        let mut url = String::new();
+        if self.https {
+            url.push_str("https://");
+        } else {
+            url.push_str("http://");
+        }
+        url.push_str(&self.host);
+        url.push_str(&self.resource);
+
+        url
     }
 
     /// Adds a header to the request this is called on. Use this
@@ -163,6 +179,7 @@ impl Request {
     /// [`SerdeJsonError`](enum.Error.html#variant.SerdeJsonError) and
     /// [`InvalidUtf8InBody`](enum.Error.html#variant.InvalidUtf8InBody).
     #[cfg(feature = "https")]
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn send(self) -> Result<Response, Error> {
         if self.https {
             let is_head = self.method == Method::Head;
@@ -181,6 +198,7 @@ impl Request {
     ///
     /// See [`send`](struct.Request.html#method.send).
     #[cfg(feature = "https")]
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn send_lazy(self) -> Result<ResponseLazy, Error> {
         if self.https {
             Connection::new(self).send_https()
@@ -200,6 +218,7 @@ impl Request {
     /// [`SerdeJsonError`](enum.Error.html#variant.SerdeJsonError) and
     /// [`InvalidUtf8InBody`](enum.Error.html#variant.InvalidUtf8InBody).
     #[cfg(not(feature = "https"))]
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn send(self) -> Result<Response, Error> {
         if self.https {
             Err(Error::HttpsFeatureNotEnabled)
@@ -210,12 +229,28 @@ impl Request {
         }
     }
 
+    /// Sends this request to the host.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` if we run into an error while sending the
+    /// request, or receiving/parsing the response. The specific error
+    /// is described in the `Err`, and it can be any
+    /// [`minreq::Error`](enum.Error.html) except
+    /// [`SerdeJsonError`](enum.Error.html#variant.SerdeJsonError) and
+    /// [`InvalidUtf8InBody`](enum.Error.html#variant.InvalidUtf8InBody).
+    #[cfg(target_arch = "wasm32")]
+    pub async fn send(self) -> Result<Response, Error> {
+        Connection::new(self).send().await
+    }
+
     /// Sends this request to the host, loaded lazily.
     ///
     /// # Errors
     ///
     /// See [`send`](struct.Request.html#method.send).
     #[cfg(not(feature = "https"))]
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn send_lazy(self) -> Result<ResponseLazy, Error> {
         if self.https {
             Err(Error::HttpsFeatureNotEnabled)
@@ -224,6 +259,7 @@ impl Request {
         }
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     fn get_http_head(&self) -> String {
         let mut http = String::with_capacity(32);
         // Add the request line and the "Host" header
@@ -241,6 +277,7 @@ impl Request {
 
     /// Returns the HTTP request as bytes, ready to be sent to
     /// the server.
+    #[cfg(not(target_arch = "wasm32"))]
     pub(crate) fn as_bytes(&self) -> Vec<u8> {
         let mut head = self.get_http_head().into_bytes();
         if let Some(body) = &self.body {
@@ -250,6 +287,7 @@ impl Request {
     }
 
     /// Returns the redirected version of this Request, unless an infinite redirection loop was detected.
+    #[cfg(not(target_arch = "wasm32"))]
     pub(crate) fn redirect_to(mut self, url: URL) -> Result<Request, Error> {
         self.redirects.push((self.https, self.host, self.resource));
 

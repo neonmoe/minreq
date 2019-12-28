@@ -1,5 +1,8 @@
-use crate::{connection::HttpStream, Error};
+#[cfg(not(target_arch = "wasm32"))]
+use crate::connection::HttpStream;
+use crate::Error;
 use std::collections::HashMap;
+#[cfg(not(target_arch = "wasm32"))]
 use std::io::{Bytes, Read};
 use std::str;
 
@@ -29,6 +32,7 @@ pub struct Response {
 }
 
 impl Response {
+    #[cfg(not(target_arch = "wasm32"))]
     pub(crate) fn create(mut parent: ResponseLazy, is_head: bool) -> Result<Response, Error> {
         let mut body = Vec::new();
         if !is_head {
@@ -52,6 +56,16 @@ impl Response {
             headers,
             body,
         })
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub(crate) fn new(status_code: i32, reason_phrase: String, headers: HashMap<String, String>, body: Vec<u8>) -> Response {
+        Self {
+            status_code,
+            reason_phrase,
+            headers,
+            body
+        }
     }
 
     /// Returns the body as an `&str`.
@@ -199,6 +213,7 @@ impl Response {
 /// # }
 ///
 /// ```
+#[cfg(not(target_arch = "wasm32"))]
 pub struct ResponseLazy {
     /// The status code of the response, eg. 404.
     pub status_code: i32,
@@ -207,11 +222,12 @@ pub struct ResponseLazy {
     /// The headers of the response. The header field names (the
     /// keys) are all lowercase.
     pub headers: HashMap<String, String>,
-
+        
     stream: Bytes<HttpStream>,
     state: HttpStreamState,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl ResponseLazy {
     pub(crate) fn from_stream(stream: HttpStream) -> Result<ResponseLazy, Error> {
         let mut stream = stream.bytes();
@@ -232,6 +248,7 @@ impl ResponseLazy {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl Iterator for ResponseLazy {
     type Item = Result<(u8, usize), Error>;
 
@@ -253,6 +270,7 @@ impl Iterator for ResponseLazy {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn read_until_closed(bytes: &mut Bytes<HttpStream>) -> Option<<ResponseLazy as Iterator>::Item> {
     if let Some(byte) = bytes.next() {
         match byte {
@@ -264,6 +282,7 @@ fn read_until_closed(bytes: &mut Bytes<HttpStream>) -> Option<<ResponseLazy as I
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn read_with_content_length(
     bytes: &mut Bytes<HttpStream>,
     content_length: &mut usize,
@@ -281,6 +300,7 @@ fn read_with_content_length(
     None
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn read_trailers(
     bytes: &mut Bytes<HttpStream>,
     headers: &mut HashMap<String, String>,
@@ -296,6 +316,7 @@ fn read_trailers(
     Ok(())
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn read_chunked(
     bytes: &mut Bytes<HttpStream>,
     headers: &mut HashMap<String, String>,
@@ -360,6 +381,7 @@ fn read_chunked(
     None
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 enum HttpStreamState {
     // No Content-Length, and Transfer-Encoding != chunked, so we just
     // read unti lthe server closes the connection (this should be the
@@ -379,6 +401,7 @@ enum HttpStreamState {
 // constructors, but not in their structs, for api-cleanliness
 // reasons. (Eg. response.status_code is much cleaner than
 // response.meta.status_code or similar.)
+#[cfg(not(target_arch = "wasm32"))]
 struct ResponseMetadata {
     status_code: i32,
     reason_phrase: String,
@@ -386,6 +409,7 @@ struct ResponseMetadata {
     state: HttpStreamState,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn read_metadata(stream: &mut Bytes<HttpStream>) -> Result<ResponseMetadata, Error> {
     let (status_code, reason_phrase) = parse_status_line(read_line(stream)?);
 
@@ -436,6 +460,7 @@ fn read_metadata(stream: &mut Bytes<HttpStream>) -> Result<ResponseMetadata, Err
     })
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn read_line(stream: &mut Bytes<HttpStream>) -> Result<String, Error> {
     let mut bytes = Vec::with_capacity(32);
     for byte in stream {
@@ -460,6 +485,7 @@ fn read_line(stream: &mut Bytes<HttpStream>) -> Result<String, Error> {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn parse_status_line(line: String) -> (i32, String) {
     let mut split = line.split(' ');
     if let Some(code) = split.nth(1) {
@@ -472,6 +498,7 @@ fn parse_status_line(line: String) -> (i32, String) {
     (503, "Server did not provide a status line".to_owned())
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn parse_header(mut line: String) -> Option<(String, String)> {
     if let Some(location) = line.find(':') {
         let value = line.split_off(location + 2);

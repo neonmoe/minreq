@@ -1,6 +1,7 @@
 /// This example demonstrates probably the most complicated part of
 /// `minreq`. Useful when making loading bars, for example.
 
+#[cfg(not(target_arch = "wasm32"))]
 fn main() -> Result<(), minreq::Error> {
     let mut buffer = Vec::new();
     for byte in minreq::get("http://httpbin.org/get").send_lazy()? {
@@ -32,15 +33,32 @@ fn main() -> Result<(), minreq::Error> {
 }
 
 // Helper functions
-
+#[cfg(not(target_arch = "wasm32"))]
 fn flush() {
     use std::io::{stdout, Write};
     stdout().lock().flush().ok();
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn sleep() {
     use std::thread::sleep;
     use std::time::Duration;
 
     sleep(Duration::from_millis(5));
+}
+
+
+/// See this example for wasm target:
+/// ```
+/// use wasm_bindgen::prelude::*;
+/// #[wasm_bindgen]
+/// pub async fn test() {
+///     unimplemented!();
+/// }
+/// ```
+/// 
+/// The example feature of cargo is not able to run this please ignore the following code.
+#[cfg(target_arch = "wasm32")]
+fn main() {
+    panic!("can't use the cargo example feature for wasm target")
 }
