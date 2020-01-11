@@ -86,3 +86,9 @@ impl error::Error for Error {
         }
     }
 }
+
+impl From<io::Error> for Error {
+    fn from(other: io::Error) -> Error {
+        Error::IoError(other)
+    }
+}

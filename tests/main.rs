@@ -42,15 +42,25 @@ fn test_json_using_serde() {
 }
 
 #[test]
-fn test_latency() {
+fn test_timeout_too_low() {
+    setup();
+    let result = minreq::get(url("/slow_a"))
+        .with_body("Q".to_string())
+        .with_timeout(1)
+        .send();
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_timeout_high_enough() {
     setup();
     let body = get_body(
         minreq::get(url("/slow_a"))
             .with_body("Q".to_string())
-            .with_timeout(1)
+            .with_timeout(3)
             .send(),
     );
-    assert_ne!(body, "j: Q");
+    assert_eq!(body, "j: Q");
 }
 
 #[test]

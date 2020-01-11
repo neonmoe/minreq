@@ -3,10 +3,10 @@ use crate::{Error, Method, Request, ResponseLazy};
 use rustls::{self, ClientConfig, ClientSession, StreamOwned};
 use std::env;
 use std::io::{self, BufReader, BufWriter, Read, Write};
-use std::net::{TcpStream, ToSocketAddrs};
+use std::net::TcpStream;
 #[cfg(feature = "https")]
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 #[cfg(feature = "https")]
 use webpki::DNSNameRef;
 #[cfg(feature = "https")]
@@ -28,28 +28,49 @@ type UnsecuredStream = BufReader<TcpStream>;
 type SecuredStream = StreamOwned<ClientSession, TcpStream>;
 
 pub(crate) enum HttpStream {
-    Unsecured(UnsecuredStream),
+    Unsecured(UnsecuredStream, Option<Instant>),
     #[cfg(feature = "https")]
-    Secured(Box<SecuredStream>),
+    Secured(Box<SecuredStream>, Option<Instant>),
 }
 
 impl HttpStream {
-    fn create_unsecured(reader: UnsecuredStream) -> HttpStream {
-        HttpStream::Unsecured(reader)
+    fn create_unsecured(reader: UnsecuredStream, timeout_at: Option<Instant>) -> HttpStream {
+        HttpStream::Unsecured(reader, timeout_at)
     }
 
     #[cfg(feature = "https")]
-    fn create_secured(reader: SecuredStream) -> HttpStream {
-        HttpStream::Secured(Box::new(reader))
+    fn create_secured(reader: SecuredStream, timeout_at: Option<Instant>) -> HttpStream {
+        HttpStream::Secured(Box::new(reader), timeout_at)
     }
 }
 
 impl Read for HttpStream {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        let timeout = |tcp: &TcpStream, timeout_at: Option<Instant>| {
+            if let Some(timeout_at) = timeout_at {
+                let now = Instant::now();
+                if timeout_at <= now {
+                    return Err(io::Error::new(
+                        io::ErrorKind::TimedOut,
+                        "The request's timeout was reached.",
+                    ));
+                } else {
+                    tcp.set_read_timeout(Some(timeout_at - now)).ok();
+                }
+            }
+            Ok(())
+        };
+
         match self {
-            HttpStream::Unsecured(inner) => inner.read(buf),
+            HttpStream::Unsecured(inner, timeout_at) => {
+                timeout(inner.get_ref(), *timeout_at)?;
+                inner.read(buf)
+            }
             #[cfg(feature = "https")]
-            HttpStream::Secured(inner) => inner.read(buf),
+            HttpStream::Secured(inner, timeout_at) => {
+                timeout(inner.get_ref(), *timeout_at)?;
+                inner.read(buf)
+            }
         }
     }
 }
@@ -81,6 +102,8 @@ impl Connection {
     pub(crate) fn send_https(mut self) -> Result<ResponseLazy, Error> {
         self.request.host = ensure_ascii_host(self.request.host)?;
         let bytes = self.request.as_bytes();
+        let timeout_duration = self.timeout.map(|d| Duration::from_secs(d));
+        let timeout_at = timeout_duration.map(|d| Instant::now() + d);
 
         // Rustls setup
         let dns_name = &self.request.host;
@@ -88,19 +111,15 @@ impl Connection {
         let dns_name = DNSNameRef::try_from_ascii_str(dns_name).unwrap();
         let sess = ClientSession::new(&CONFIG, dns_name);
 
-        let tcp = match create_tcp_stream(&self.request.host, self.timeout) {
-            Ok(tcp) => tcp,
-            Err(err) => return Err(Error::IoError(err)),
-        };
+        let tcp = TcpStream::connect(&self.request.host)?;
 
         // Send request
         let mut tls = StreamOwned::new(sess, tcp);
-        if let Err(err) = tls.write(&bytes) {
-            return Err(Error::IoError(err));
-        }
+        tls.get_ref().set_write_timeout(timeout_duration).ok();
+        tls.write(&bytes)?;
 
         // Receive request
-        let response = ResponseLazy::from_stream(HttpStream::create_secured(tls))?;
+        let response = ResponseLazy::from_stream(HttpStream::create_secured(tls, timeout_at))?;
         handle_redirects(self, response)
     }
 
@@ -109,17 +128,15 @@ impl Connection {
     pub(crate) fn send(mut self) -> Result<ResponseLazy, Error> {
         self.request.host = ensure_ascii_host(self.request.host)?;
         let bytes = self.request.as_bytes();
+        let timeout_duration = self.timeout.map(|d| Duration::from_secs(d));
+        let timeout_at = timeout_duration.map(|d| Instant::now() + d);
 
-        let tcp = match create_tcp_stream(&self.request.host, self.timeout) {
-            Ok(tcp) => tcp,
-            Err(err) => return Err(Error::IoError(err)),
-        };
+        let tcp = TcpStream::connect(&self.request.host)?;
 
         // Send request
         let mut stream = BufWriter::new(tcp);
-        if let Err(err) = stream.write_all(&bytes) {
-            return Err(Error::IoError(err));
-        }
+        stream.get_ref().set_write_timeout(timeout_duration).ok();
+        stream.write_all(&bytes)?;
 
         // Receive response
         let tcp = match stream.into_inner() {
@@ -130,7 +147,7 @@ impl Connection {
                 ));
             }
         };
-        let stream = HttpStream::create_unsecured(BufReader::new(tcp));
+        let stream = HttpStream::create_unsecured(BufReader::new(tcp), timeout_at);
         let response = ResponseLazy::from_stream(stream)?;
         handle_redirects(self, response)
     }
@@ -177,19 +194,6 @@ fn get_redirect(
 
         _ => None,
     }
-}
-
-fn create_tcp_stream<A>(host: A, timeout: Option<u64>) -> Result<TcpStream, std::io::Error>
-where
-    A: ToSocketAddrs,
-{
-    let stream = TcpStream::connect(host)?;
-    if let Some(secs) = timeout {
-        let dur = Some(Duration::from_secs(secs));
-        stream.set_read_timeout(dur)?;
-        stream.set_write_timeout(dur)?;
-    }
-    Ok(stream)
 }
 
 fn ensure_ascii_host(host: String) -> Result<String, Error> {

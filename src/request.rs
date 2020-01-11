@@ -134,7 +134,7 @@ impl Request {
         }
     }
 
-    /// Sets the request timeout.
+    /// Sets the request timeout in seconds.
     pub fn with_timeout(mut self, timeout: u64) -> Request {
         self.timeout = Some(timeout);
         self
