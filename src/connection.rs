@@ -107,8 +107,13 @@ impl Connection {
 
         // Rustls setup
         let dns_name = &self.request.host;
+        // parse_url in response.rs ensures that there is always a
+        // ":port" in the host, which is why this unwrap is safe.
         let dns_name = dns_name.split(':').next().unwrap();
-        let dns_name = DNSNameRef::try_from_ascii_str(dns_name).unwrap();
+        let dns_name = match DNSNameRef::try_from_ascii_str(dns_name) {
+            Ok(result) => result,
+            Err(err) => return Err(Error::IoError(io::Error::new(io::ErrorKind::Other, err))),
+        };
         let sess = ClientSession::new(&CONFIG, dns_name);
 
         let tcp = TcpStream::connect(&self.request.host)?;
@@ -170,10 +175,10 @@ fn get_redirect(
 ) -> Option<Result<Request, Error>> {
     match status_code {
         301 | 302 | 303 | 307 => {
-            if url.is_none() {
-                return Some(Err(Error::RedirectLocationMissing));
-            }
-            let url = url.unwrap();
+            let url = match url {
+                Some(url) => url,
+                None => return Some(Err(Error::RedirectLocationMissing)),
+            };
 
             match connection.request.redirect_to(url.clone()) {
                 Ok(mut request) => {
