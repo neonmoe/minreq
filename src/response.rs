@@ -474,7 +474,21 @@ fn parse_status_line(line: String) -> (i32, String) {
 
 fn parse_header(mut line: String) -> Option<(String, String)> {
     if let Some(location) = line.find(':') {
-        let value = line.split_off(location + 1);
+        // Trim the first character of the header if it is a space,
+        // otherwise return everything after the ':'. This should
+        // preserve the behavior in versions <=2.0.1 in most cases
+        // (namely, ones where it was valid), where the first
+        // character after ':' was always cut off.
+        let value = if let Some(sp) = line.get(location + 1..location + 2) {
+            if sp == " " {
+                line[location + 2..].to_string()
+            } else {
+                line[location + 1..].to_string()
+            }
+        } else {
+            line[location + 1..].to_string()
+        };
+
         line.truncate(location);
         // Headers should be ascii, I'm pretty sure. If not, please open an issue.
         line.make_ascii_lowercase();
