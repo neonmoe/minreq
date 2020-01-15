@@ -474,7 +474,7 @@ fn parse_status_line(line: String) -> (i32, String) {
 
 fn parse_header(mut line: String) -> Option<(String, String)> {
     if let Some(location) = line.find(':') {
-        let value = line.split_off(location + 2);
+        let value = line.split_off(location + 1);
         line.truncate(location);
         // Headers should be ascii, I'm pretty sure. If not, please open an issue.
         line.make_ascii_lowercase();
