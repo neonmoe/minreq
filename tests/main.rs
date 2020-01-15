@@ -7,6 +7,23 @@ use serde_derive::{Deserialize, Serialize};
 use self::setup::*;
 
 #[test]
+// Test based on issue #23: https://github.com/neonmoe/minreq/issues/23
+fn test_headers_char_boundary_panic() {
+    // This will panic with a `assertion failed: self.is_char_boundary(at)`
+    // until the issue is fixed.
+    minreq::get("http://iheartradio.com").send().ok();
+}
+
+#[test]
+#[cfg(feature = "https")]
+// Test based on issue #24: https://github.com/neonmoe/minreq/issues/24
+fn test_dns_name_error() {
+    // This will panic by unwrapping a InvalidDNSNameError until the
+    // issue is fixed.
+    minreq::get("http://virtualflorist.com").send().ok();
+}
+
+#[test]
 #[cfg(feature = "https")]
 fn test_https() {
     // TODO: Implement this locally.
