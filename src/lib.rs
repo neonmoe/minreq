@@ -133,6 +133,23 @@
 //! # Ok(()) }
 //! ```
 //!
+//! ## Proxy
+//! To use a proxy server, simply provide create a `Proxy` instance
+//! and use `.with_proxy()` on your request.
+//!
+//! Supported proxy formats are `host:port` and `user:password@proxy:host`.
+//! Only HTTP CONNECT proxies are supported at this time.
+//! ```no_run
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! let proxy = minreq::Proxy::new("localhost:8080")?;
+//! let response = minreq::post("http://httpbin.org/delay/1")
+//!     .with_proxy(proxy)
+//!     .send()?;
+//! println!("{}", response.as_str()?);
+//! # Ok(()) }
+//! ```
+//!
+//!
 //! # Timeouts
 //! By default, a request has no timeout.  You can change this in two ways:
 //! - Use [`with_timeout`](struct.Request.html#method.with_timeout) on
@@ -169,9 +186,11 @@ extern crate webpki_roots;
 
 mod connection;
 mod error;
+mod proxy;
 mod request;
 mod response;
 
 pub use error::*;
+pub use proxy::*;
 pub use request::*;
 pub use response::*;

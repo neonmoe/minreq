@@ -42,6 +42,15 @@ pub enum Error {
     /// characters, but it could not be converted into punycode
     /// because the `punycode` feature was not enabled.
     PunycodeFeatureNotEnabled,
+    /// The provided proxy information was not properly formatted.
+    /// Supported proxy format is `[user:password@]host:port`.
+    BadProxy,
+    /// The provided credentials were rejected by the proxy server.
+    BadProxyCreds,
+    /// The provided proxy credentials were malformed.
+    ProxyConnect,
+    /// The provided credentials were rejected by the proxy server.
+    InvalidProxyCreds,
 
     /// This is a special error case, one that should never be
     /// returned! Think of this as a cleaner alternative to calling
@@ -69,6 +78,10 @@ impl fmt::Display for Error {
             HttpsFeatureNotEnabled => write!(f, "request url contains https:// but the https feature is not enabled"),
             PunycodeFeatureNotEnabled => write!(f, "non-ascii urls needs to be converted into punycode, and the feature is missing"),
             PunycodeConversionFailed => write!(f, "non-ascii url conversion to punycode failed"),
+            BadProxy => write!(f, "the provided proxy information is malformed"),
+            BadProxyCreds => write!(f, "the provided proxy credentials are malformed"),
+            ProxyConnect => write!(f, "could not connect to the proxy server"),
+            InvalidProxyCreds => write!(f, "the provided proxy credentials are invalid"),
             Other(msg) => write!(f, "error in minreq: please open an issue in the minreq repo, include the following: '{}'", msg),
         }
     }

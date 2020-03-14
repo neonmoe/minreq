@@ -455,7 +455,7 @@ fn read_line(stream: &mut Bytes<HttpStream>) -> Result<String, Error> {
         }
     }
     match String::from_utf8(bytes) {
-        Ok(line) => Ok(line.to_string()),
+        Ok(line) => Ok(line),
         Err(_) => Err(Error::InvalidUtf8InResponse),
     }
 }
