@@ -35,6 +35,7 @@ default = []
 
 https = ["rustls", "webpki-roots", "webpki", "lazy_static"]
 json-using-serde = ["serde", "serde_json"]
+proxy = []
 
 [[example]]
 name = "hello"

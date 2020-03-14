@@ -50,6 +50,10 @@
 //! [`PunycodeFeatureNotEnabled`](enum.Error.html#variant.PunycodeFeatureNotEnabled)
 //! error.
 //!
+//! ## `proxy`
+//!
+//! This feature enables proxy support.  
+//!
 //! # Examples
 //!
 //! ## Get
@@ -141,11 +145,14 @@
 //! Only HTTP CONNECT proxies are supported at this time.
 //! ```no_run
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! let proxy = minreq::Proxy::new("localhost:8080")?;
-//! let response = minreq::post("http://httpbin.org/delay/1")
-//!     .with_proxy(proxy)
-//!     .send()?;
-//! println!("{}", response.as_str()?);
+//! #[cfg(feature = "proxy")]
+//! {
+//!     let proxy = minreq::Proxy::new("localhost:8080")?;
+//!     let response = minreq::post("http://httpbin.org/delay/1")
+//!         .with_proxy(proxy)
+//!         .send()?;
+//!     println!("{}", response.as_str()?);
+//! }
 //! # Ok(()) }
 //! ```
 //!
@@ -186,11 +193,13 @@ extern crate webpki_roots;
 
 mod connection;
 mod error;
+#[cfg(feature = "proxy")]
 mod proxy;
 mod request;
 mod response;
 
 pub use error::*;
+#[cfg(feature = "proxy")]
 pub use proxy::*;
 pub use request::*;
 pub use response::*;

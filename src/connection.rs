@@ -158,6 +158,7 @@ impl Connection {
     }
 
     fn connect(&self) -> Result<TcpStream, Error> {
+        #[cfg(feature = "proxy")]
         match self.request.proxy {
             Some(ref proxy) => {
                 // do proxy things
@@ -184,6 +185,9 @@ impl Connection {
             }
             None => TcpStream::connect(&self.request.host).map_err(Error::from),
         }
+
+        #[cfg(not(feature = "proxy"))]
+        TcpStream::connect(&self.request.host).map_err(Error::from)
     }
 }
 

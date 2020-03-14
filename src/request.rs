@@ -1,4 +1,5 @@
 use crate::connection::Connection;
+#[cfg(feature = "proxy")]
 use crate::proxy::Proxy;
 use crate::{Error, Response, ResponseLazy};
 use std::collections::HashMap;
@@ -78,6 +79,7 @@ pub struct Request {
     max_redirects: usize,
     https: bool,
     pub(crate) redirects: Vec<(bool, URL, URL)>,
+    #[cfg(feature = "proxy")]
     pub(crate) proxy: Option<Proxy>,
 }
 
@@ -98,6 +100,7 @@ impl Request {
             max_redirects: 100,
             https,
             redirects: Vec::new(),
+            #[cfg(feature = "proxy")]
             proxy: None,
         }
     }
@@ -275,6 +278,7 @@ impl Request {
     }
 
     /// Sets the proxy to use.
+    #[cfg(feature = "proxy")]
     pub fn with_proxy(mut self, proxy: Proxy) -> Request {
         self.proxy = Some(proxy);
         self
