@@ -11,3 +11,4 @@ script:
   - cargo test --features "https"
   - cargo test --features "json-using-serde"
   - cargo test --features "punycode"
+  - cargo test --features "proxy"

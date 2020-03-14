@@ -138,7 +138,7 @@
 //! ```
 //!
 //! ## Proxy
-//! To use a proxy server, simply provide create a `Proxy` instance
+//! To use a proxy server, simply create a `Proxy` instance
 //! and use `.with_proxy()` on your request.
 //!
 //! Supported proxy formats are `host:port` and `user:password@proxy:host`.

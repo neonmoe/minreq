@@ -116,7 +116,7 @@ impl Connection {
         };
         let sess = ClientSession::new(&CONFIG, dns_name);
 
-        let tcp = self.connect()?; //TcpStream::connect(&self.request.host)?;
+        let tcp = self.connect()?;
 
         // Send request
         let mut tls = StreamOwned::new(sess, tcp);
@@ -136,7 +136,7 @@ impl Connection {
         let timeout_duration = self.timeout.map(Duration::from_secs);
         let timeout_at = timeout_duration.map(|d| Instant::now() + d);
 
-        let tcp = self.connect()?; //TcpStream::connect(&self.request.host)?;
+        let tcp = self.connect()?;
 
         // Send request
         let mut stream = BufWriter::new(tcp);
