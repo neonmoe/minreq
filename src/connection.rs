@@ -116,7 +116,7 @@ impl Connection {
         };
         let sess = ClientSession::new(&CONFIG, dns_name);
 
-        let tcp = TcpStream::connect(&self.request.host)?;
+        let tcp = self.connect()?; //TcpStream::connect(&self.request.host)?;
 
         // Send request
         let mut tls = StreamOwned::new(sess, tcp);
@@ -133,10 +133,10 @@ impl Connection {
     pub(crate) fn send(mut self) -> Result<ResponseLazy, Error> {
         self.request.host = ensure_ascii_host(self.request.host)?;
         let bytes = self.request.as_bytes();
-        let timeout_duration = self.timeout.map(|d| Duration::from_secs(d));
+        let timeout_duration = self.timeout.map(Duration::from_secs);
         let timeout_at = timeout_duration.map(|d| Instant::now() + d);
 
-        let tcp = TcpStream::connect(&self.request.host)?;
+        let tcp = self.connect()?; //TcpStream::connect(&self.request.host)?;
 
         // Send request
         let mut stream = BufWriter::new(tcp);
@@ -155,6 +155,35 @@ impl Connection {
         let stream = HttpStream::create_unsecured(BufReader::new(tcp), timeout_at);
         let response = ResponseLazy::from_stream(stream)?;
         handle_redirects(self, response)
+    }
+
+    fn connect(&self) -> Result<TcpStream, Error> {
+        match self.request.proxy {
+            Some(ref proxy) => {
+                // do proxy things
+                let proxy_host = format!("{}:{}", proxy.server, proxy.port);
+                let mut tcp = TcpStream::connect(&proxy_host).map_err(Error::from)?;
+
+                write!(tcp, "{}", proxy.connect(self.request.host.as_str())).unwrap();
+                tcp.flush()?;
+
+                let mut proxy_response = Vec::new();
+
+                loop {
+                    let mut buf = vec![0; 256];
+                    let total = tcp.read(&mut buf)?;
+                    proxy_response.append(&mut buf);
+                    if total < 256 {
+                        break;
+                    }
+                }
+
+                crate::Proxy::verify_response(&proxy_response)?;
+
+                Ok(tcp)
+            }
+            None => TcpStream::connect(&self.request.host).map_err(Error::from),
+        }
     }
 }
 

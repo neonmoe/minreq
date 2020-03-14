@@ -17,6 +17,7 @@ travis-ci = { repository = "neonmoe/minreq" }
 maintenance = { status = "passively-maintained" }
 
 [dependencies]
+base64 = "0.12"
 rustls = { version = "^0.16.0", optional = true }
 webpki-roots = { version = "^0.18.0", optional = true }
 webpki = { version = "^0.21.0", optional = true }
