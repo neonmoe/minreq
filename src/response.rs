@@ -31,7 +31,7 @@ pub struct Response {
 impl Response {
     pub(crate) fn create(mut parent: ResponseLazy, is_head: bool) -> Result<Response, Error> {
         let mut body = Vec::new();
-        if !is_head {
+        if !is_head && parent.status_code != 204 {
             for byte in &mut parent {
                 let (byte, length) = byte?;
                 body.reserve(length);
