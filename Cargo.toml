@@ -25,15 +25,21 @@ lazy_static = { version = "^1.4.0", optional = true }
 serde = { version = "^1.0.101", optional = true }
 serde_json = { version = "^1.0.41", optional = true }
 punycode = { version = "^0.4.1", optional = true }
+log = { version = "0.4.5", optional = true }
+openssl = { version = "0.10.29", optional = true }
+openssl-probe = { version = "0.1", optional = true }
+native-tls = { version = "0.2", optional = true }
 
 [dev-dependencies]
 tiny_http = "^0.6.2"
 serde_derive = "^1.0.101"
 
 [features]
-default = []
-
-https = ["rustls", "webpki-roots", "webpki", "lazy_static"]
+https = ["https-rustls"]
+https-rustls = ["rustls", "lazy_static", "webpki-roots", "webpki"]
+https-bundled = ["log", "openssl/vendored"]
+https-bundled-probe = ["https-bundled", "openssl-probe"]
+https-native = ["native-tls"]
 json-using-serde = ["serde", "serde_json"]
 proxy = ["base64"]
 
@@ -46,3 +52,5 @@ name = "iterator"
 [[example]]
 name = "json"
 required-features = ["json-using-serde"]
+
+# vim: ft=conf

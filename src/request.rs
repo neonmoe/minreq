@@ -168,7 +168,7 @@ impl Request {
     /// [`minreq::Error`](enum.Error.html) except
     /// [`SerdeJsonError`](enum.Error.html#variant.SerdeJsonError) and
     /// [`InvalidUtf8InBody`](enum.Error.html#variant.InvalidUtf8InBody).
-    #[cfg(feature = "https")]
+    #[cfg(any(feature = "rustls", feature = "openssl", feature = "native-tls"))]
     pub fn send(self) -> Result<Response, Error> {
         if self.https {
             let is_head = self.method == Method::Head;
@@ -186,7 +186,7 @@ impl Request {
     /// # Errors
     ///
     /// See [`send`](struct.Request.html#method.send).
-    #[cfg(feature = "https")]
+    #[cfg(any(feature = "rustls", feature = "openssl", feature = "native-tls"))]
     pub fn send_lazy(self) -> Result<ResponseLazy, Error> {
         if self.https {
             Connection::new(self).send_https()
@@ -205,7 +205,7 @@ impl Request {
     /// [`minreq::Error`](enum.Error.html) except
     /// [`SerdeJsonError`](enum.Error.html#variant.SerdeJsonError) and
     /// [`InvalidUtf8InBody`](enum.Error.html#variant.InvalidUtf8InBody).
-    #[cfg(not(feature = "https"))]
+    #[cfg(not(any(feature = "rustls", feature = "openssl", feature = "native-tls")))]
     pub fn send(self) -> Result<Response, Error> {
         if self.https {
             Err(Error::HttpsFeatureNotEnabled)
@@ -221,7 +221,7 @@ impl Request {
     /// # Errors
     ///
     /// See [`send`](struct.Request.html#method.send).
-    #[cfg(not(feature = "https"))]
+    #[cfg(not(any(feature = "rustls", feature = "openssl", feature = "native-tls")))]
     pub fn send_lazy(self) -> Result<ResponseLazy, Error> {
         if self.https {
             Err(Error::HttpsFeatureNotEnabled)
