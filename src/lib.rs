@@ -17,7 +17,7 @@
 //!
 //! Below is the list of all available features.
 //!
-//! ## `https`
+//! ## `https` or `https-rustls`
 //!
 //! This feature uses the (very good)
 //! [`rustls`](https://crates.io/crates/rustls) crate to secure the
@@ -26,6 +26,25 @@
 //! `https://` will fail and return a
 //! [`HttpsFeatureNotEnabled`](enum.Error.html#variant.HttpsFeatureNotEnabled)
 //! error.
+//!
+//! ## `https-native`
+//!
+//! Like `https`, but uses [`tls-native`](https://crates.io/crates/native-tls)
+//! instead of `rustls`.
+//!
+//! ## `https-bundled`
+//!
+//! Like `https`, but uses a statically linked copy of the OpenSSL library
+//! (provided by [`openssl-sys`](https://crates.io/crates/openssl-sys) with
+//! features = "vendored"). This feature on its own doesn't provide any
+//! detection of where your root certificates are installed. They can be specified
+//! via the environment variables `SSL_CERT_FILE` or `SSL_CERT_DIR`.
+//!
+//! ## `https-bundled-probe`
+//!
+//! Like `https-bundled`, but also includes the
+//! [`openssl-probe`](https://crates.io/crates/openssl-probe) crate to auto-detect
+//! root certificates installed in common locations.
 //!
 //! ## `json-using-serde`
 //!
@@ -180,16 +199,26 @@
 
 #![deny(missing_docs)]
 
-#[cfg(feature = "https")]
+#[cfg(feature = "rustls")]
 extern crate rustls;
+#[cfg(feature = "openssl")]
+mod native_tls;
+#[cfg(feature = "openssl")]
+#[macro_use]
+extern crate log;
+#[cfg(feature = "rustls")]
+extern crate webpki;
+#[cfg(feature = "rustls")]
+extern crate webpki_roots;
+#[cfg(feature = "openssl-probe")]
+extern crate openssl_probe;
+#[cfg(feature = "native-tls")]
+extern crate native_tls;
+
 #[cfg(feature = "json-using-serde")]
 extern crate serde;
 #[cfg(feature = "json-using-serde")]
 extern crate serde_json;
-#[cfg(feature = "https")]
-extern crate webpki;
-#[cfg(feature = "https")]
-extern crate webpki_roots;
 
 mod connection;
 mod error;

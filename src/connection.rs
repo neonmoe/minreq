@@ -1,18 +1,22 @@
 use crate::{Error, Method, Request, ResponseLazy};
-#[cfg(feature = "https")]
+#[cfg(feature = "rustls")]
 use rustls::{self, ClientConfig, ClientSession, StreamOwned};
+#[cfg(feature = "openssl")]
+use crate::native_tls::{TlsConnector, TlsStream};
+#[cfg(feature = "native-tls")]
+use native_tls::{TlsConnector, TlsStream};
 use std::env;
 use std::io::{self, BufReader, BufWriter, Read, Write};
 use std::net::TcpStream;
-#[cfg(feature = "https")]
+#[cfg(feature = "rustls")]
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-#[cfg(feature = "https")]
+#[cfg(feature = "webpki")]
 use webpki::DNSNameRef;
-#[cfg(feature = "https")]
+#[cfg(feature = "webpki")]
 use webpki_roots::TLS_SERVER_ROOTS;
 
-#[cfg(feature = "https")]
+#[cfg(feature = "rustls")]
 lazy_static::lazy_static! {
     static ref CONFIG: Arc<ClientConfig> = {
         let mut config = ClientConfig::new();
@@ -24,12 +28,14 @@ lazy_static::lazy_static! {
 }
 
 type UnsecuredStream = BufReader<TcpStream>;
-#[cfg(feature = "https")]
+#[cfg(feature = "rustls")]
 type SecuredStream = StreamOwned<ClientSession, TcpStream>;
+#[cfg(any(feature = "openssl", feature = "native-tls"))]
+type SecuredStream = TlsStream<TcpStream>;
 
 pub(crate) enum HttpStream {
     Unsecured(UnsecuredStream, Option<Instant>),
-    #[cfg(feature = "https")]
+    #[cfg(any(feature = "rustls", feature = "openssl", feature = "native-tls"))]
     Secured(Box<SecuredStream>, Option<Instant>),
 }
 
@@ -38,7 +44,7 @@ impl HttpStream {
         HttpStream::Unsecured(reader, timeout_at)
     }
 
-    #[cfg(feature = "https")]
+    #[cfg(any(feature = "rustls", feature = "openssl", feature = "native-tls"))]
     fn create_secured(reader: SecuredStream, timeout_at: Option<Instant>) -> HttpStream {
         HttpStream::Secured(Box::new(reader), timeout_at)
     }
@@ -66,7 +72,7 @@ impl Read for HttpStream {
                 timeout(inner.get_ref(), *timeout_at)?;
                 inner.read(buf)
             }
-            #[cfg(feature = "https")]
+            #[cfg(any(feature = "rustls", feature = "openssl", feature = "native-tls"))]
             HttpStream::Secured(inner, timeout_at) => {
                 timeout(inner.get_ref(), *timeout_at)?;
                 inner.read(buf)
@@ -98,7 +104,7 @@ impl Connection {
 
     /// Sends the [`Request`](struct.Request.html), consumes this
     /// connection, and returns a [`Response`](struct.Response.html).
-    #[cfg(feature = "https")]
+    #[cfg(feature = "rustls")]
     pub(crate) fn send_https(mut self) -> Result<ResponseLazy, Error> {
         self.request.host = ensure_ascii_host(self.request.host)?;
         let bytes = self.request.as_bytes();
@@ -120,7 +126,45 @@ impl Connection {
 
         // Send request
         let mut tls = StreamOwned::new(sess, tcp);
-        tls.get_ref().set_write_timeout(timeout_duration).ok();
+        tls.get_ref().set_write_timeout(timeout_duration).ok(); // ?
+        tls.write(&bytes)?;
+
+        // Receive request
+        let response = ResponseLazy::from_stream(HttpStream::create_secured(tls, timeout_at))?;
+        handle_redirects(self, response)
+    }
+
+    /// Sends the [`Request`](struct.Request.html), consumes this
+    /// connection, and returns a [`Response`](struct.Response.html).
+    #[cfg(any(feature = "openssl", feature = "native-tls"))]
+    pub(crate) fn send_https(mut self) -> Result<ResponseLazy, Error> {
+        self.request.host = ensure_ascii_host(self.request.host)?;
+        let bytes = self.request.as_bytes();
+        let timeout_duration = self.timeout.map(|d| Duration::from_secs(d));
+        let timeout_at = timeout_duration.map(|d| Instant::now() + d);
+
+        let dns_name = &self.request.host;
+        // parse_url in response.rs ensures that there is always a
+        // ":port" in the host, which is why this unwrap is safe.
+        let dns_name = dns_name.split(':').next().unwrap();
+        /*
+        let mut builder = TlsConnector::builder();
+        ...
+        let sess = match builder.build() {
+        */
+        let sess = match TlsConnector::new() {
+            Ok(sess) => sess,
+            Err(err) => return Err(Error::IoError(io::Error::new(io::ErrorKind::Other, err))),
+        };
+
+        let tcp = self.connect()?;
+
+        // Send request
+        let mut tls = match sess.connect(dns_name, tcp) {
+            Ok(tls) => tls,
+            Err(err) => return Err(Error::IoError(io::Error::new(io::ErrorKind::Other, err))),
+        };
+        tls.get_ref().set_write_timeout(timeout_duration).ok(); // ?
         tls.write(&bytes)?;
 
         // Receive request

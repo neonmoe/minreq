@@ -15,7 +15,7 @@ fn test_headers_char_boundary_panic() {
 }
 
 #[test]
-#[cfg(feature = "https")]
+#[cfg(any(feature = "rustls", feature = "openssl", feature = "native-tls"))]
 // Test based on issue #24: https://github.com/neonmoe/minreq/issues/24
 fn test_dns_name_error() {
     // This will panic by unwrapping a InvalidDNSNameError until the
@@ -24,7 +24,7 @@ fn test_dns_name_error() {
 }
 
 #[test]
-#[cfg(feature = "https")]
+#[cfg(any(feature = "rustls", feature = "openssl", feature = "native-tls"))]
 fn test_https() {
     // TODO: Implement this locally.
     assert_eq!(
