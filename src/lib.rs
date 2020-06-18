@@ -25,7 +25,9 @@
 //! (and it is not by default), requests to urls that start with
 //! `https://` will fail and return a
 //! [`HttpsFeatureNotEnabled`](enum.Error.html#variant.HttpsFeatureNotEnabled)
-//! error.
+//! error. `https` was the name of this feature until the other https
+//! feature variants were added, and is now an alias for
+//! `https-rustls`.
 //!
 //! ## `https-native`
 //!
@@ -206,14 +208,14 @@ mod native_tls;
 #[cfg(feature = "openssl")]
 #[macro_use]
 extern crate log;
+#[cfg(feature = "native-tls")]
+extern crate native_tls;
+#[cfg(feature = "openssl-probe")]
+extern crate openssl_probe;
 #[cfg(feature = "rustls")]
 extern crate webpki;
 #[cfg(feature = "rustls")]
 extern crate webpki_roots;
-#[cfg(feature = "openssl-probe")]
-extern crate openssl_probe;
-#[cfg(feature = "native-tls")]
-extern crate native_tls;
 
 #[cfg(feature = "json-using-serde")]
 extern crate serde;

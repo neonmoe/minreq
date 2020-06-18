@@ -6,9 +6,11 @@ rust:
 script:
   - cargo test
   - cargo test --release
-  - cargo test --all-features
-  - cargo test --all-features --release
+  - cargo test --features "https json-using-serde punycode proxy"
+  - cargo test --features "https json-using-serde punycode proxy" --release
   - cargo test --features "https"
+  - cargo test --features "https-bundled-probe"
+  - cargo test --features "https-native"
   - cargo test --features "json-using-serde"
   - cargo test --features "punycode"
   - cargo test --features "proxy"

@@ -1,10 +1,10 @@
-use crate::{Error, Method, Request, ResponseLazy};
-#[cfg(feature = "rustls")]
-use rustls::{self, ClientConfig, ClientSession, StreamOwned};
 #[cfg(feature = "openssl")]
 use crate::native_tls::{TlsConnector, TlsStream};
+use crate::{Error, Method, Request, ResponseLazy};
 #[cfg(feature = "native-tls")]
 use native_tls::{TlsConnector, TlsStream};
+#[cfg(feature = "rustls")]
+use rustls::{self, ClientConfig, ClientSession, StreamOwned};
 use std::env;
 use std::io::{self, BufReader, BufWriter, Read, Write};
 use std::net::TcpStream;
@@ -126,7 +126,8 @@ impl Connection {
 
         // Send request
         let mut tls = StreamOwned::new(sess, tcp);
-        tls.get_ref().set_write_timeout(timeout_duration).ok(); // ?
+        // The connection could drop mid-write, so set a timeout
+        tls.get_ref().set_write_timeout(timeout_duration).ok();
         tls.write(&bytes)?;
 
         // Receive request
@@ -164,7 +165,8 @@ impl Connection {
             Ok(tls) => tls,
             Err(err) => return Err(Error::IoError(io::Error::new(io::ErrorKind::Other, err))),
         };
-        tls.get_ref().set_write_timeout(timeout_duration).ok(); // ?
+        // The connection could drop mid-write, so set a timeout
+        tls.get_ref().set_write_timeout(timeout_duration).ok();
         tls.write(&bytes)?;
 
         // Receive request
