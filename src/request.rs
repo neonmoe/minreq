@@ -73,7 +73,7 @@ pub struct Request {
     pub(crate) method: Method,
     pub(crate) host: URL,
     resource: URL,
-    headers: HashMap<String, String>,
+    pub(crate) headers: HashMap<String, String>,
     body: Option<Vec<u8>>,
     pub(crate) timeout: Option<u64>,
     max_redirects: usize,

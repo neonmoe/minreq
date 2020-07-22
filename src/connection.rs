@@ -112,7 +112,7 @@ impl Connection {
         let timeout_at = timeout_duration.map(|d| Instant::now() + d);
 
         // Rustls setup
-        let dns_name = &self.request.host;
+        let dns_name = self.request.headers.get("Host").unwrap_or(&self.request.host);
         // parse_url in response.rs ensures that there is always a
         // ":port" in the host, which is why this unwrap is safe.
         let dns_name = dns_name.split(':').next().unwrap();
