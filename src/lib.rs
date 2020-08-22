@@ -12,7 +12,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! minreq = { version = "*", features = ["https", "json-using-serde", "punycode"] }
+//! minreq = { version = "2.2.1", features = ["punycode"] }
 //! ```
 //!
 //! Below is the list of all available features.
@@ -73,7 +73,7 @@
 //!
 //! ## `proxy`
 //!
-//! This feature enables proxy support.  
+//! This feature enables proxy support.
 //!
 //! # Examples
 //!
