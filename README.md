@@ -11,7 +11,14 @@ proxies (`proxy`), and https with various TLS implementations
 
 Without any optional features, my casual testing indicates about 100
 KB additional executable size for stripped release builds using this
-crate.
+crate. Compiled with rustc 1.45.2, `println!("Hello, World!");` is 239
+KB on my machine, where the [hello](examples/hello.rs) example is 347
+KB. Both are pure Rust, so aside from `libc`, everything is statically
+linked.
+
+Note: some of the dependencies of this crate (especially `serde` and
+the various `https` libraries) are a lot more complicated than this
+library, and their impact on executable size reflects that.
 
 ## [Documentation](https://docs.rs/minreq)
 
