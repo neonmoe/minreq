@@ -89,6 +89,11 @@ pub fn setup() {
                         );
                         request.respond(response).ok();
                     }
+                    Method::Get if url == "/relativeredirect" => {
+                        let response = Response::empty(303)
+                            .with_header(Header::from_bytes(&b"Location"[..], &b"/a"[..]).unwrap());
+                        request.respond(response).ok();
+                    }
 
                     Method::Post if url == "/echo" => {
                         request.respond(Response::from_string(content)).ok();

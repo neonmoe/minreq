@@ -257,9 +257,16 @@ impl Request {
 
     /// Returns the redirected version of this Request, unless an infinite redirection loop was detected.
     pub(crate) fn redirect_to(mut self, url: URL) -> Result<Request, Error> {
+        let absolute_url = if url.contains("://") {
+            url
+        } else {
+            let schema = if self.https { "https" } else { "http" };
+            format!("{}://{}{}", schema, self.host, url)
+        };
+
         self.redirects.push((self.https, self.host, self.resource));
 
-        let (https, host, resource) = parse_url(url);
+        let (https, host, resource) = parse_url(absolute_url);
         self.host = host;
         self.resource = resource;
         self.https = https;
