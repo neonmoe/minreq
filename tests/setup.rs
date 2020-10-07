@@ -25,8 +25,9 @@ pub fn setup() {
                 let mut content = String::new();
                 request.as_reader().read_to_string(&mut content).ok();
                 let headers = Vec::from(request.headers());
+                let fragment = request.url().split('#').nth(1).unwrap_or("");
 
-                let url = String::from(request.url());
+                let url = String::from(request.url().split('#').next().unwrap());
                 match request.method() {
                     Method::Get if url == "/header_pong" => {
                         for header in headers {
@@ -46,11 +47,22 @@ pub fn setup() {
                     }
 
                     Method::Get if url == "/a" => {
-                        let response = Response::from_string(format!("j: {}", content));
+                        let response = Response::from_string(format!("j: {}{}", content, fragment));
                         request.respond(response).ok();
                     }
                     Method::Post if url == "/a" => {
                         let response = Response::from_string("POST to /a is not valid.");
+                        request.respond(response).ok();
+                    }
+
+                    Method::Get if url == "/redirect-baz" => {
+                        let response = Response::empty(301).with_header(
+                            Header::from_bytes(
+                                &b"Location"[..],
+                                &b"http://localhost:35562/a#baz"[..],
+                            )
+                            .unwrap(),
+                        );
                         request.respond(response).ok();
                     }
 

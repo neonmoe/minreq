@@ -255,24 +255,54 @@ impl Request {
         head
     }
 
-    /// Returns the redirected version of this Request, unless an infinite redirection loop was detected.
+    /// Returns the redirected version of this Request, unless an
+    /// infinite redirection loop was detected, or the redirection
+    /// limit was reached.
     pub(crate) fn redirect_to(mut self, url: URL) -> Result<Request, Error> {
-        let absolute_url = if url.contains("://") {
-            url
-        } else {
-            let schema = if self.https { "https" } else { "http" };
-            format!("{}://{}{}", schema, self.host, url)
+        // If the redirected resource does not have a fragment, but
+        // the original URL did, the fragment should be preserved over
+        // redirections. See RFC 7231 section 7.1.2.
+        let inherit_fragment = |resource: String, original_resource: &str| {
+            if resource.chars().any(|c| c == '#') {
+                println!("Resource has a resource, not inheriting.");
+                resource
+            } else {
+                let mut original_resource_split = original_resource.split('#');
+                if let Some(fragment) = original_resource_split.nth(1) {
+                    println!("Using inherited fragment.");
+                    format!("{}#{}", resource, fragment)
+                } else {
+                    println!(
+                        "Neither has a resource, not inheriting. Original: {}",
+                        original_resource
+                    );
+                    resource
+                }
+            }
         };
 
-        self.redirects.push((self.https, self.host, self.resource));
+        if url.contains("://") {
+            let (https, host, resource) = parse_url(url);
+            let new_resource = inherit_fragment(resource, &self.resource);
 
-        let (https, host, resource) = parse_url(absolute_url);
-        self.host = host;
-        self.resource = resource;
-        self.https = https;
+            self.redirects.push((self.https, self.host, self.resource));
+
+            self.https = https;
+            self.resource = new_resource;
+            self.host = host;
+        } else {
+            // The url does not have the protocol part, assuming it's
+            // a relative resource.
+            let new_resource = inherit_fragment(url, &self.resource);
+
+            self.redirects
+                .push((self.https, self.host.clone(), self.resource));
+
+            self.resource = new_resource;
+        }
 
         let is_this_url = |(https_, host_, resource_): &(bool, URL, URL)| {
-            *resource_ == self.resource && *host_ == self.host && *https_ == https
+            resource_ == &self.resource && host_ == &self.host && https_ == &self.https
         };
 
         if self.redirects.len() > self.max_redirects {

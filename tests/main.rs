@@ -129,6 +129,20 @@ fn test_redirect_post() {
 }
 
 #[test]
+fn test_redirect_with_fragment() {
+    setup();
+    let body = get_body(minreq::get(url("/redirect#foo")).with_body("Q").send());
+    assert_eq!(body, "j: Qfoo");
+}
+
+#[test]
+fn test_redirect_with_overridden_fragment() {
+    setup();
+    let body = get_body(minreq::get(url("/redirect-baz#foo")).with_body("Q").send());
+    assert_eq!(body, "j: Qbaz");
+}
+
+#[test]
 fn test_infinite_redirect() {
     setup();
     let body = minreq::get(url("/infiniteredirect")).send();

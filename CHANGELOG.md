@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+- **Breaking:** the redirection code was improved to match [RFC 7231
+  section 7.1.2](https://tools.ietf.org/html/rfc7231#section-7.1.2),
+  which could subtly break some programs relying on very specific
+  redirects, which is why I consider this breaking. No API changes
+  though. The following two points are now fixed when redirecting:
+  - Fragments, the bit after a #-character in the url. If the
+    redirecting url has a fragment, and the one in `Location` does
+    not, the original fragment should be included in the new url. If
+    `Location` does have a fragment, it should override the one in the
+    redirecting url.
+  - Relative urls. Minreq now properly redirects when `Location` is
+    relative, e.g. `/Foo.html` instead of
+    `https://example.com/Foo.html`. Thanks, @fjt523!
+
 ## [2.2.1] - 2020-08-22
 ### Fixed
 - Some documentation which has been long due for an update. I just
