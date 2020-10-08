@@ -131,8 +131,8 @@ impl Request {
     #[cfg(feature = "json-using-serde")]
     pub fn with_json<T: serde::ser::Serialize>(mut self, body: &T) -> Result<Request, Error> {
         self.headers.insert(
-            "Content-Type".to_string(),
-            "application/json; charset=UTF-8".to_string(),
+            "Content-Type".to_owned(),
+            "application/json; charset=UTF-8".to_owned(),
         );
         match serde_json::to_string(&body) {
             Ok(json) => Ok(self.with_body(json)),

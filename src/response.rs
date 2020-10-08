@@ -321,7 +321,7 @@ fn read_chunked(
                     }
 
                     *expecting_more_chunks = false;
-                    headers.insert("content-length".to_string(), (*content_length).to_string());
+                    headers.insert("content-length".to_owned(), (*content_length).to_string());
                     headers.remove("transfer-encoding");
                     return None;
                 }
@@ -465,7 +465,7 @@ fn parse_status_line(line: String) -> (i32, String) {
     if let Some(code) = split.nth(1) {
         if let Ok(code) = code.parse::<i32>() {
             if let Some(reason) = split.next() {
-                return (code, reason.to_string());
+                return (code, reason.to_owned());
             }
         }
     }
@@ -481,12 +481,12 @@ fn parse_header(mut line: String) -> Option<(String, String)> {
         // character after ':' was always cut off.
         let value = if let Some(sp) = line.get(location + 1..location + 2) {
             if sp == " " {
-                line[location + 2..].to_string()
+                line[location + 2..].to_owned()
             } else {
-                line[location + 1..].to_string()
+                line[location + 1..].to_owned()
             }
         } else {
-            line[location + 1..].to_string()
+            line[location + 1..].to_owned()
         };
 
         line.truncate(location);
