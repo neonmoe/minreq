@@ -241,6 +241,25 @@ impl Request {
         for (k, v) in &self.headers {
             http += &format!("{}: {}\r\n", k, v);
         }
+
+
+        if self.method == Method::Post || self.method == Method::Put || self.method == Method::Patch {
+            if let None = self.headers.keys().find(|key| {
+                let key = key.to_lowercase();
+                key == "content-length" || key == "transfer-encoding"
+            }) {
+                // A user agent SHOULD send a Content-Length in a request message when no Transfer-Encoding
+                // is sent and the request method defines a meaning for an enclosed payload body.
+                // refer: https://tools.ietf.org/html/rfc7230#section-3.3.2
+
+                // A client MUST NOT send a message body in a TRACE request.
+                // refer: https://tools.ietf.org/html/rfc7231#section-4.3.8
+                // similar line found for GET, HEAD, CONNECT and DELETE.
+
+                http += "Content-Length: 0\r\n";
+            }
+        }
+
         http += "\r\n";
         http
     }
