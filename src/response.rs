@@ -439,25 +439,16 @@ fn read_metadata(stream: &mut Bytes<HttpStream>) -> Result<ResponseMetadata, Err
 fn read_line(stream: &mut Bytes<HttpStream>) -> Result<String, Error> {
     let mut bytes = Vec::with_capacity(32);
     for byte in stream {
-        match byte {
-            Ok(byte) => {
-                if byte == b'\n' {
-                    // Pop the \r off, as HTTP lines end in \r\n.
-                    bytes.pop();
-                    break;
-                } else {
-                    bytes.push(byte);
-                }
-            }
-            Err(err) => {
-                return Err(Error::IoError(err));
-            }
+        let byte = byte?;
+        if byte == b'\n' {
+            // Pop the \r off, as HTTP lines end in \r\n.
+            bytes.pop();
+            break;
+        } else {
+            bytes.push(byte);
         }
     }
-    match String::from_utf8(bytes) {
-        Ok(line) => Ok(line),
-        Err(_) => Err(Error::InvalidUtf8InResponse),
-    }
+    String::from_utf8(bytes).map_err(|_error|Error::InvalidUtf8InResponse)
 }
 
 fn parse_status_line(line: &str) -> (i32, String) {
