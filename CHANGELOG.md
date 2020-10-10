@@ -5,6 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
 - **Breaking:** the redirection code was improved to match [RFC 7231
   section 7.1.2](https://tools.ietf.org/html/rfc7231#section-7.1.2),
   which could subtly break some programs relying on very specific
@@ -18,6 +19,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Relative urls. Minreq now properly redirects when `Location` is
     relative, e.g. `/Foo.html` instead of
     `https://example.com/Foo.html`. Thanks, @fjt523!
+
+### Fixed
+- The `Content-Length: 0` header is now inserted into requests that
+  should have it. Thanks, @KarthikNedunchezhiyan!
+- Status line parsing is now fixed, so "400 Bad Request" is not parsed
+  as "400 Bad". Thanks, @KarthikNedunchezhiyan!
 
 ## [2.2.1] - 2020-08-22
 ### Fixed
