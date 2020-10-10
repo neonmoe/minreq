@@ -387,7 +387,7 @@ struct ResponseMetadata {
 }
 
 fn read_metadata(stream: &mut Bytes<HttpStream>) -> Result<ResponseMetadata, Error> {
-    let (status_code, reason_phrase) = parse_status_line(read_line(stream)?);
+    let (status_code, reason_phrase) = parse_status_line(&read_line(stream)?);
 
     let mut headers = HashMap::new();
     loop {
@@ -460,16 +460,33 @@ fn read_line(stream: &mut Bytes<HttpStream>) -> Result<String, Error> {
     }
 }
 
-fn parse_status_line(line: String) -> (i32, String) {
-    let mut split = line.split(' ');
-    if let Some(code) = split.nth(1) {
-        if let Ok(code) = code.parse::<i32>() {
-            if let Some(reason) = split.next() {
-                return (code, reason.to_string());
-            }
+fn parse_status_line(line: &str) -> (i32, String) {
+    // sample status line format
+    // HTTP/1.1 200 OK
+    let mut status_code = String::with_capacity(3);
+    let mut reason_phrase = String::with_capacity(2);
+
+    let mut spaces = 0;
+
+    for c in line.chars() {
+        if spaces >= 2 {
+            reason_phrase.push(c);
+        }
+
+        if c == ' ' {
+            spaces += 1;
+        } else if spaces == 1 {
+            status_code.push(c);
         }
     }
-    (503, "Server did not provide a status line".to_owned())
+
+    if let Ok(status_code) = status_code.parse::<i32>() {
+        if !reason_phrase.is_empty() {
+            return (status_code, reason_phrase);
+        }
+    }
+
+    (503, "Server did not provide a status line".to_string())
 }
 
 fn parse_header(mut line: String) -> Option<(String, String)> {
