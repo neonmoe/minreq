@@ -84,8 +84,8 @@ impl Certificate {
     }
 
     /// Parses a PEM-formatted X509 certificate.
-    pub fn from_pem(der: &[u8]) -> Result<Certificate> {
-        let cert = imp::Certificate::from_pem(der)?;
+    pub fn from_pem(pem: &[u8]) -> Result<Certificate> {
+        let cert = imp::Certificate::from_pem(pem)?;
         Ok(Certificate(cert))
     }
 
@@ -341,7 +341,7 @@ impl TlsConnectorBuilder {
 /// stream.read_to_end(&mut res).unwrap();
 /// println!("{}", String::from_utf8_lossy(&res));
 /// ```
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct TlsConnector(imp::TlsConnector);
 
 impl TlsConnector {
