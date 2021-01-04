@@ -5,12 +5,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+Nothing, yet.
+
+## [2.3.0] - 2021-01-04
 ### Changed
-- **Breaking:** the redirection code was improved to match [RFC 7231
-  section 7.1.2](https://tools.ietf.org/html/rfc7231#section-7.1.2),
-  which could subtly break some programs relying on very specific
-  redirects, which is why I consider this breaking. No API changes
-  though. The following two points are now fixed when redirecting:
+- **Breaking (sort of):** the redirection code was improved to match
+  [RFC 7231 section
+  7.1.2](https://tools.ietf.org/html/rfc7231#section-7.1.2), which
+  could subtly break some programs relying on very specific redirects,
+  which is why this should be investigated if you come across weird
+  behaviour after updating. No API changes though, so only a minor
+  version bump. The following two points are now fixed when
+  redirecting:
   - Fragments, the bit after a #-character in the url. If the
     redirecting url has a fragment, and the one in `Location` does
     not, the original fragment should be included in the new url. If
