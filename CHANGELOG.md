@@ -32,6 +32,9 @@ Nothing, yet.
 - Status line parsing is now fixed, so "400 Bad Request" is not parsed
   as "400 Bad". Thanks, @KarthikNedunchezhiyan!
 
+### Added
+- M1 Mac support by bumping the ring dependency. Thanks, @ryanmcgrath!
+
 ## [2.2.1] - 2020-08-22
 ### Fixed
 - Some documentation which has been long due for an update. I just
