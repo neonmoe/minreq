@@ -242,8 +242,8 @@ impl Request {
             http += &format!("{}: {}\r\n", k, v);
         }
 
-
-        if self.method == Method::Post || self.method == Method::Put || self.method == Method::Patch {
+        if self.method == Method::Post || self.method == Method::Put || self.method == Method::Patch
+        {
             if let None = self.headers.keys().find(|key| {
                 let key = key.to_lowercase();
                 key == "content-length" || key == "transfer-encoding"
@@ -283,18 +283,12 @@ impl Request {
         // redirections. See RFC 7231 section 7.1.2.
         let inherit_fragment = |resource: String, original_resource: &str| {
             if resource.chars().any(|c| c == '#') {
-                println!("Resource has a resource, not inheriting.");
                 resource
             } else {
                 let mut original_resource_split = original_resource.split('#');
                 if let Some(fragment) = original_resource_split.nth(1) {
-                    println!("Using inherited fragment.");
                     format!("{}#{}", resource, fragment)
                 } else {
-                    println!(
-                        "Neither has a resource, not inheriting. Original: {}",
-                        original_resource
-                    );
                     resource
                 }
             }
