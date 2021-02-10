@@ -124,8 +124,8 @@ impl Connection {
 
         let tcp = self.connect(timeout_duration)?;
 
-        // connect phase may have taken spend some time. so, calibrating the timeout.
-        calibrate_timeout_checked(&mut timeout_duration, timeout_at)?;
+        // Connect phase may have taken spend some time. so, calibrating the timeout.
+        calibrate_timeout(&mut timeout_duration, timeout_at)?;
 
         // Send request
         let mut tls = StreamOwned::new(sess, tcp);
@@ -163,8 +163,8 @@ impl Connection {
 
         let tcp = self.connect(timeout_duration)?;
 
-        // connect phase may have taken spend some time. so, calibrating the timeout.
-        calibrate_timeout_checked(&mut timeout_duration, timeout_at)?;
+        // Connect phase may have taken spend some time. so, calibrating the timeout.
+        calibrate_timeout(&mut timeout_duration, timeout_at)?;
 
         // Send request
         let mut tls = match sess.connect(dns_name, tcp) {
@@ -190,8 +190,8 @@ impl Connection {
 
         let tcp = self.connect(timeout_duration)?;
 
-        // connect phase may have taken spend some time. so, calibrating the timeout.
-        calibrate_timeout_checked(&mut timeout_duration, timeout_at)?;
+        // Connect phase may have taken spend some time. so, calibrating the timeout.
+        calibrate_timeout(&mut timeout_duration, timeout_at)?;
 
         // Send request
         let mut stream = BufWriter::new(tcp);
@@ -213,14 +213,18 @@ impl Connection {
     }
 
     fn connect(&self, timeout: Option<Duration>) -> Result<TcpStream, Error> {
-
-        let tcp_connect = |host: &str| -> Result<TcpStream, Error>{
+        let tcp_connect = |host: &str| -> Result<TcpStream, Error> {
             if let Some(timeout) = timeout {
-                let sock_address = host.to_socket_addrs().map_err(Error::IoError)?.next().ok_or(Error::Other("failed to lookup address information"))?;
+                let sock_address = host
+                    .to_socket_addrs()
+                    .map_err(Error::IoError)?
+                    .next()
+                    .ok_or(Error::Other("failed to lookup address information"))?;
                 TcpStream::connect_timeout(&sock_address, timeout)
-            }else{
+            } else {
                 TcpStream::connect(host)
-            }.map_err(Error::from)
+            }
+            .map_err(Error::from)
         };
 
         #[cfg(feature = "proxy")]
@@ -328,23 +332,19 @@ fn ensure_ascii_host(host: String) -> Result<String, Error> {
     }
 }
 
-fn calibrate_timeout_checked(timeout: &mut Option<Duration>, timeout_at: Option<Instant>) -> Result<(), Error> {
-    if let Some(timeout) = timeout {
-        // unwrap is safe because timeout_at cannot be null when timeout is available.
-        calibrate_timeout(timeout, timeout_at.unwrap())?;
-    }
-
-    Ok(())
-}
-
-fn calibrate_timeout(timeout: &mut Duration, timeout_at: Instant) -> Result<(), Error> {
-    if let Some(balance_time) = timeout_at.checked_duration_since(Instant::now()) {
-       *timeout = balance_time;
-    }else{
-       return Err(Error::IoError(io::Error::new(
-                        io::ErrorKind::TimedOut,
-                        "The request's timeout was reached.",
-                    )))
+fn calibrate_timeout(
+    timeout: &mut Option<Duration>,
+    timeout_at: Option<Instant>,
+) -> Result<(), Error> {
+    if let (Some(timeout), Some(timeout_at)) = (timeout, timeout_at) {
+        if let Some(balance_time) = timeout_at.checked_duration_since(Instant::now()) {
+            *timeout = balance_time;
+        } else {
+            return Err(Error::IoError(io::Error::new(
+                io::ErrorKind::TimedOut,
+                "the request's timeout was reached during the initial connection",
+            )));
+        }
     }
 
     Ok(())
