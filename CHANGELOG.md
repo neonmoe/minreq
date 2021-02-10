@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 Nothing, yet.
 
+## [2.3.1] - 2021-02-10
+### Fixed
+- Removed some leftover printlns from the redirection update in 2.3.0
+  and ensured there's no printlns in the library anymore. Thanks for
+  reporting the issue @Shnatsel!
+  [#45](https://github.com/neonmoe/minreq/issues/45)
+- Fixed the timeout not being respected during the initial TCP
+  connect. Thanks for the report and fix @KarthikNedunchezhiyan!
+  [#46](https://github.com/neonmoe/minreq/issues/46),
+  [#47](https://github.com/neonmoe/minreq/pull/47)
+
 ## [2.3.0] - 2021-01-04
 ### Changed
 - **Breaking (sort of):** the redirection code was improved to match
