@@ -5,6 +5,7 @@ mod setup;
 use serde_derive::{Deserialize, Serialize};
 
 use self::setup::*;
+use std::io;
 
 #[test]
 // Test based on issue #23: https://github.com/neonmoe/minreq/issues/23
@@ -207,4 +208,11 @@ fn test_patch() {
     setup();
     let body = get_body(minreq::patch(url("/i")).with_body("O").send());
     assert_eq!(body, "r: O");
+}
+
+#[test]
+fn tcp_connect_timeout() {
+    let resp = minreq::Request::new(minreq::Method::Get, "http://54.158.248.248:91").with_timeout(1).send();
+    assert!(resp.is_err());
+    assert_eq!(format!("{:?}", resp.err().unwrap()), format!("{:?}", minreq::Error::IoError(io::Error::new(io::ErrorKind::TimedOut, "connection timed out"))));
 }
