@@ -7,7 +7,7 @@ use native_tls::{TlsConnector, TlsStream};
 use rustls::{self, ClientConfig, ClientSession, StreamOwned};
 use std::env;
 use std::io::{self, BufReader, BufWriter, Read, Write};
-use std::net::TcpStream;
+use std::net::{TcpStream, ToSocketAddrs};
 #[cfg(feature = "rustls")]
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -108,7 +108,7 @@ impl Connection {
     pub(crate) fn send_https(mut self) -> Result<ResponseLazy, Error> {
         self.request.host = ensure_ascii_host(self.request.host)?;
         let bytes = self.request.as_bytes();
-        let timeout_duration = self.timeout.map(|d| Duration::from_secs(d));
+        let mut timeout_duration = self.timeout.map(|d| Duration::from_secs(d));
         let timeout_at = timeout_duration.map(|d| Instant::now() + d);
 
         // Rustls setup
@@ -122,7 +122,10 @@ impl Connection {
         };
         let sess = ClientSession::new(&CONFIG, dns_name);
 
-        let tcp = self.connect()?;
+        let tcp = self.connect(timeout_duration)?;
+
+        // connect phase may have taken spend some time. so, calibrating the timeout.
+        calibrate_timeout_checked(&mut timeout_duration, timeout_at)?;
 
         // Send request
         let mut tls = StreamOwned::new(sess, tcp);
@@ -141,7 +144,7 @@ impl Connection {
     pub(crate) fn send_https(mut self) -> Result<ResponseLazy, Error> {
         self.request.host = ensure_ascii_host(self.request.host)?;
         let bytes = self.request.as_bytes();
-        let timeout_duration = self.timeout.map(|d| Duration::from_secs(d));
+        let mut timeout_duration = self.timeout.map(|d| Duration::from_secs(d));
         let timeout_at = timeout_duration.map(|d| Instant::now() + d);
 
         let dns_name = &self.request.host;
@@ -158,7 +161,10 @@ impl Connection {
             Err(err) => return Err(Error::IoError(io::Error::new(io::ErrorKind::Other, err))),
         };
 
-        let tcp = self.connect()?;
+        let tcp = self.connect(timeout_duration)?;
+
+        // connect phase may have taken spend some time. so, calibrating the timeout.
+        calibrate_timeout_checked(&mut timeout_duration, timeout_at)?;
 
         // Send request
         let mut tls = match sess.connect(dns_name, tcp) {
@@ -179,10 +185,13 @@ impl Connection {
     pub(crate) fn send(mut self) -> Result<ResponseLazy, Error> {
         self.request.host = ensure_ascii_host(self.request.host)?;
         let bytes = self.request.as_bytes();
-        let timeout_duration = self.timeout.map(Duration::from_secs);
+        let mut timeout_duration = self.timeout.map(Duration::from_secs);
         let timeout_at = timeout_duration.map(|d| Instant::now() + d);
 
-        let tcp = self.connect()?;
+        let tcp = self.connect(timeout_duration)?;
+
+        // connect phase may have taken spend some time. so, calibrating the timeout.
+        calibrate_timeout_checked(&mut timeout_duration, timeout_at)?;
 
         // Send request
         let mut stream = BufWriter::new(tcp);
@@ -203,13 +212,23 @@ impl Connection {
         handle_redirects(self, response)
     }
 
-    fn connect(&self) -> Result<TcpStream, Error> {
+    fn connect(&self, timeout: Option<Duration>) -> Result<TcpStream, Error> {
+
+        let tcp_connect = |host: &str| -> Result<TcpStream, Error>{
+            if let Some(timeout) = timeout {
+                let sock_address = host.to_socket_addrs().map_err(Error::IoError)?.next().ok_or(Error::Other("failed to lookup address information"))?;
+                TcpStream::connect_timeout(&sock_address, timeout)
+            }else{
+                TcpStream::connect(host)
+            }.map_err(Error::from)
+        };
+
         #[cfg(feature = "proxy")]
         match self.request.proxy {
             Some(ref proxy) => {
                 // do proxy things
                 let proxy_host = format!("{}:{}", proxy.server, proxy.port);
-                let mut tcp = TcpStream::connect(&proxy_host).map_err(Error::from)?;
+                let mut tcp = tcp_connect(&proxy_host)?;
 
                 write!(tcp, "{}", proxy.connect(self.request.host.as_str())).unwrap();
                 tcp.flush()?;
@@ -229,11 +248,11 @@ impl Connection {
 
                 Ok(tcp)
             }
-            None => TcpStream::connect(&self.request.host).map_err(Error::from),
+            None => tcp_connect(&self.request.host),
         }
 
         #[cfg(not(feature = "proxy"))]
-        TcpStream::connect(&self.request.host).map_err(Error::from)
+        tcp_connect(&self.request.host)
     }
 }
 
@@ -307,4 +326,26 @@ fn ensure_ascii_host(host: String) -> Result<String, Error> {
             Ok(result)
         }
     }
+}
+
+fn calibrate_timeout_checked(timeout: &mut Option<Duration>, timeout_at: Option<Instant>) -> Result<(), Error> {
+    if let Some(timeout) = timeout {
+        // unwrap is safe because timeout_at cannot be null when timeout is available.
+        calibrate_timeout(timeout, timeout_at.unwrap())?;
+    }
+
+    Ok(())
+}
+
+fn calibrate_timeout(timeout: &mut Duration, timeout_at: Instant) -> Result<(), Error> {
+    if let Some(balance_time) = timeout_at.checked_duration_since(Instant::now()) {
+       *timeout = balance_time;
+    }else{
+       return Err(Error::IoError(io::Error::new(
+                        io::ErrorKind::TimedOut,
+                        "The request's timeout was reached.",
+                    )))
+    }
+
+    Ok(())
 }
