@@ -313,23 +313,31 @@ fn read_chunked(
             Ok(line) => line,
             Err(err) => return Some(Err(err)),
         };
-        match usize::from_str_radix(&length_line, 16) {
-            Ok(incoming_length) => {
-                if incoming_length == 0 {
-                    if let Err(err) = read_trailers(bytes, headers) {
-                        return Some(Err(err));
-                    }
 
-                    *expecting_more_chunks = false;
-                    headers.insert("content-length".to_string(), (*content_length).to_string());
-                    headers.remove("transfer-encoding");
-                    return None;
-                }
-                *chunk_length = incoming_length;
-                *content_length += incoming_length;
+        // Note: the trim() and check for empty lines shouldn't be
+        // needed according to the RFC, but we might as well, it's a
+        // small change and it fixes a few servers.
+        let incoming_length = if length_line.is_empty() {
+            0
+        } else {
+            match usize::from_str_radix(length_line.trim(), 16) {
+                Ok(length) => length,
+                Err(_) => return Some(Err(Error::MalformedChunkLength)),
             }
-            Err(_) => return Some(Err(Error::MalformedChunkLength)),
+        };
+
+        if incoming_length == 0 {
+            if let Err(err) = read_trailers(bytes, headers) {
+                return Some(Err(err));
+            }
+
+            *expecting_more_chunks = false;
+            headers.insert("content-length".to_string(), (*content_length).to_string());
+            headers.remove("transfer-encoding");
+            return None;
         }
+        *chunk_length = incoming_length;
+        *content_length += incoming_length;
     }
 
     if *chunk_length > 0 {
@@ -448,7 +456,7 @@ fn read_line(stream: &mut Bytes<HttpStream>) -> Result<String, Error> {
             bytes.push(byte);
         }
     }
-    String::from_utf8(bytes).map_err(|_error|Error::InvalidUtf8InResponse)
+    String::from_utf8(bytes).map_err(|_error| Error::InvalidUtf8InResponse)
 }
 
 fn parse_status_line(line: &str) -> (i32, String) {
