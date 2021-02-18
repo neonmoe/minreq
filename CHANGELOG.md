@@ -5,7 +5,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-Nothing, yet.
+### Fixed
+- Chunk length handling for some servers with slightly off-spec chunk
+  lengths. Thanks for the report, @Shnatsel!
+  ([#50](https://github.com/neonmoe/minreq/issues/50))
 
 ## [2.3.1] - 2021-02-10
 ### Fixed

@@ -22,5 +22,14 @@ library, and their impact on executable size reflects that.
 
 ## [Documentation](https://docs.rs/minreq)
 
+## Planned for 3.0.0
+
+This is a list of features I'll implement once it gets long enough, or
+a severe enough issue is found that there's good reason to make a
+major version bump.
+
+- Change the response/request structs to allow multiple headers with
+  the same name.
+
 ## License
 This crate is distributed under the terms of the [ISC license](COPYING.md).

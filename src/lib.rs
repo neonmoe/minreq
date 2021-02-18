@@ -1,7 +1,8 @@
 //! # Minreq
-//! Simple, minimal-dependency HTTP client.
-//! The library has a very minimal API, so you'll probably know
-//! everything you need to after reading a few examples.
+//!
+//! Simple, minimal-dependency HTTP client.  The library has a very
+//! minimal API, so you'll probably know everything you need to after
+//! reading a few examples.
 //!
 //! # Additional features
 //!
@@ -31,22 +32,25 @@
 //!
 //! ## `https-native`
 //!
-//! Like `https`, but uses [`tls-native`](https://crates.io/crates/native-tls)
-//! instead of `rustls`.
+//! Like `https`, but uses
+//! [`tls-native`](https://crates.io/crates/native-tls) instead of
+//! `rustls`.
 //!
 //! ## `https-bundled`
 //!
-//! Like `https`, but uses a statically linked copy of the OpenSSL library
-//! (provided by [`openssl-sys`](https://crates.io/crates/openssl-sys) with
-//! features = "vendored"). This feature on its own doesn't provide any
-//! detection of where your root certificates are installed. They can be specified
-//! via the environment variables `SSL_CERT_FILE` or `SSL_CERT_DIR`.
+//! Like `https`, but uses a statically linked copy of the OpenSSL
+//! library (provided by
+//! [`openssl-sys`](https://crates.io/crates/openssl-sys) with
+//! features = "vendored"). This feature on its own doesn't provide
+//! any detection of where your root certificates are installed. They
+//! can be specified via the environment variables `SSL_CERT_FILE` or
+//! `SSL_CERT_DIR`.
 //!
 //! ## `https-bundled-probe`
 //!
 //! Like `https-bundled`, but also includes the
-//! [`openssl-probe`](https://crates.io/crates/openssl-probe) crate to auto-detect
-//! root certificates installed in common locations.
+//! [`openssl-probe`](https://crates.io/crates/openssl-probe) crate to
+//! auto-detect root certificates installed in common locations.
 //!
 //! ## `json-using-serde`
 //!
@@ -145,10 +149,12 @@
 //! ```
 //!
 //! ## Timeouts
+//!
 //! To avoid timing out, or limit the request's response time, use
 //! `with_timeout(n)` before `send()`. The given value is in seconds.
 //!
 //! NOTE: There is no timeout by default.
+//!
 //! ```no_run
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let response = minreq::post("http://httpbin.org/delay/6")
@@ -159,11 +165,14 @@
 //! ```
 //!
 //! ## Proxy
-//! To use a proxy server, simply create a `Proxy` instance
-//! and use `.with_proxy()` on your request.
 //!
-//! Supported proxy formats are `host:port` and `user:password@proxy:host`.
-//! Only HTTP CONNECT proxies are supported at this time.
+//! To use a proxy server, simply create a `Proxy` instance and use
+//! `.with_proxy()` on your request.
+//!
+//! Supported proxy formats are `host:port` and
+//! `user:password@proxy:host`. Only HTTP CONNECT proxies are
+//! supported at this time.
+//!
 //! ```no_run
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! #[cfg(feature = "proxy")]
@@ -177,9 +186,11 @@
 //! # Ok(()) }
 //! ```
 //!
-//!
 //! # Timeouts
-//! By default, a request has no timeout.  You can change this in two ways:
+//!
+//! By default, a request has no timeout. You can change this in two
+//! ways:
+//!
 //! - Use [`with_timeout`](struct.Request.html#method.with_timeout) on
 //!   your request to set the timeout per-request like so:
 //!   ```
