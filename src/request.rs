@@ -77,7 +77,7 @@ pub struct Request {
     body: Option<Vec<u8>>,
     pub(crate) timeout: Option<u64>,
     max_redirects: usize,
-    https: bool,
+    pub(crate) https: bool,
     pub(crate) redirects: Vec<(bool, URL, URL)>,
     #[cfg(feature = "proxy")]
     pub(crate) proxy: Option<Proxy>,
@@ -277,7 +277,7 @@ impl Request {
     /// Returns the redirected version of this Request, unless an
     /// infinite redirection loop was detected, or the redirection
     /// limit was reached.
-    pub(crate) fn redirect_to(mut self, url: URL) -> Result<Request, Error> {
+    pub(crate) fn redirect_to(&mut self, url: URL) -> Result<(), Error> {
         // If the redirected resource does not have a fragment, but
         // the original URL did, the fragment should be preserved over
         // redirections. See RFC 7231 section 7.1.2.
@@ -295,23 +295,19 @@ impl Request {
         };
 
         if url.contains("://") {
-            let (https, host, resource) = parse_url(url);
-            let new_resource = inherit_fragment(resource, &self.resource);
-
-            self.redirects.push((self.https, self.host, self.resource));
-
-            self.https = https;
-            self.resource = new_resource;
-            self.host = host;
+            let (mut https, mut host, resource) = parse_url(url);
+            let mut resource = inherit_fragment(resource, &self.resource);
+            std::mem::swap(&mut https, &mut self.https);
+            std::mem::swap(&mut host, &mut self.host);
+            std::mem::swap(&mut resource, &mut self.resource);
+            self.redirects.push((https, host, resource));
         } else {
             // The url does not have the protocol part, assuming it's
             // a relative resource.
-            let new_resource = inherit_fragment(url, &self.resource);
-
+            let mut resource = inherit_fragment(url, &self.resource);
+            std::mem::swap(&mut resource, &mut self.resource);
             self.redirects
-                .push((self.https, self.host.clone(), self.resource));
-
-            self.resource = new_resource;
+                .push((self.https, self.host.clone(), resource));
         }
 
         let is_this_url = |(https_, host_, resource_): &(bool, URL, URL)| {
@@ -323,7 +319,7 @@ impl Request {
         } else if self.redirects.iter().any(is_this_url) {
             Err(Error::InfiniteRedirectionLoop)
         } else {
-            Ok(self)
+            Ok(())
         }
     }
 

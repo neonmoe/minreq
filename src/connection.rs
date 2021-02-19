@@ -263,37 +263,48 @@ impl Connection {
 fn handle_redirects(connection: Connection, response: ResponseLazy) -> Result<ResponseLazy, Error> {
     let status_code = response.status_code;
     let url = response.headers.get("location");
-    if let Some(request) = get_redirect(connection, status_code, url) {
-        request?.send_lazy()
+    if let Some(connection) = get_redirect(connection, status_code, url) {
+        let connection = connection?;
+        // TODO: Fix connection.timeout for redirected requests.
+        #[cfg(not(any(feature = "rustls", feature = "openssl", feature = "native-tls")))]
+        if connection.request.https {
+            return Err(Error::HttpsFeatureNotEnabled);
+        }
+        if connection.request.https {
+            connection.send_https()
+        } else {
+            connection.send()
+        }
     } else {
         Ok(response)
     }
 }
 
 fn get_redirect(
-    connection: Connection,
+    mut connection: Connection,
     status_code: i32,
     url: Option<&String>,
-) -> Option<Result<Request, Error>> {
+) -> Option<Result<Connection, Error>> {
     match status_code {
         301 | 302 | 303 | 307 => {
             let url = match url {
                 Some(url) => url,
                 None => return Some(Err(Error::RedirectLocationMissing)),
             };
+            log::debug!("Redirecting to: {}", url);
 
             match connection.request.redirect_to(url.clone()) {
-                Ok(mut request) => {
+                Ok(()) => {
                     if status_code == 303 {
-                        match request.method {
+                        match connection.request.method {
                             Method::Post | Method::Put | Method::Delete => {
-                                request.method = Method::Get;
+                                connection.request.method = Method::Get;
                             }
                             _ => {}
                         }
                     }
 
-                    Some(Ok(request))
+                    Some(Ok(connection))
                 }
                 Err(err) => Some(Err(err)),
             }
