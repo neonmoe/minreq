@@ -332,29 +332,48 @@ impl Request {
 }
 
 fn parse_url(url: URL) -> (bool, URL, URL) {
-    let mut first = URL::new();
-    let mut second = URL::new();
-    let mut slashes = 0;
+    enum UrlParseStatus {
+        Protocol,
+        AtFirstSlash,
+        Host,
+        Resource,
+    }
+
+    let mut host = URL::new();
+    let mut resource = URL::new();
+    let mut status = UrlParseStatus::Protocol;
     for c in url.chars() {
-        if c == '/' {
-            slashes += 1;
-        } else if slashes == 2 {
-            first.push(c);
-        }
-        if slashes >= 3 {
-            second.push(c);
+        match status {
+            UrlParseStatus::Protocol if c == '/' => {
+                status = UrlParseStatus::AtFirstSlash;
+            }
+            UrlParseStatus::AtFirstSlash if c == '/' => {
+                status = UrlParseStatus::Host;
+            }
+            UrlParseStatus::Host => {
+                match c {
+                    '/' | '?' => {
+                        // Tolerate typos like: www.example.com?some=params
+                        status = UrlParseStatus::Resource;
+                        resource.push(c);
+                    }
+                    _ => host.push(c),
+                }
+            }
+            UrlParseStatus::Resource => resource.push(c),
+            _ => {}
         }
     }
     // Ensure the resource is *something*
-    if second.is_empty() {
-        second += "/";
+    if resource.is_empty() {
+        resource += "/";
     }
     // Set appropriate port
     let https = url.starts_with("https://");
-    if !first.contains(':') {
-        first += if https { ":443" } else { ":80" };
+    if !host.contains(':') {
+        host += if https { ":443" } else { ":80" };
     }
-    (https, first, second)
+    (https, host, resource)
 }
 
 /// Alias for [Request::new](struct.Request.html#method.new) with `method` set to

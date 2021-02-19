@@ -50,20 +50,25 @@ impl HttpStream {
     }
 }
 
+fn timeout_at_to_duration(timeout_at: Option<Instant>) -> Result<Option<Duration>, io::Error> {
+    if let Some(timeout_at) = timeout_at {
+        if let Some(duration) = timeout_at.checked_duration_since(Instant::now()) {
+            Ok(Some(duration))
+        } else {
+            Err(io::Error::new(
+                io::ErrorKind::TimedOut,
+                "The request's timeout was reached.",
+            ))
+        }
+    } else {
+        Ok(None)
+    }
+}
+
 impl Read for HttpStream {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        let timeout = |tcp: &TcpStream, timeout_at: Option<Instant>| {
-            if let Some(timeout_at) = timeout_at {
-                let now = Instant::now();
-                if timeout_at <= now {
-                    return Err(io::Error::new(
-                        io::ErrorKind::TimedOut,
-                        "The request's timeout was reached.",
-                    ));
-                } else {
-                    tcp.set_read_timeout(Some(timeout_at - now)).ok();
-                }
-            }
+        let timeout = |tcp: &TcpStream, timeout_at: Option<Instant>| -> io::Result<()> {
+            let _ = tcp.set_read_timeout(timeout_at_to_duration(timeout_at)?);
             Ok(())
         };
 
@@ -85,7 +90,7 @@ impl Read for HttpStream {
 /// [`Request`](struct.Request.html)s.
 pub struct Connection {
     request: Request,
-    timeout: Option<u64>,
+    timeout_at: Option<Instant>,
 }
 
 impl Connection {
@@ -99,7 +104,19 @@ impl Connection {
                 Ok(t) => t.parse::<u64>().ok(),
                 Err(_) => None,
             });
-        Connection { request, timeout }
+        let timeout_at = timeout.map(|t| Instant::now() + Duration::from_secs(t));
+        Connection {
+            request,
+            timeout_at,
+        }
+    }
+
+    /// Returns the timeout duration for operations that should end at
+    /// timeout and are starting "now".
+    ///
+    /// The Result will be Err if the timeout has already passed.
+    fn timeout(&self) -> Result<Option<Duration>, io::Error> {
+        timeout_at_to_duration(self.timeout_at)
     }
 
     /// Sends the [`Request`](struct.Request.html), consumes this
@@ -108,10 +125,9 @@ impl Connection {
     pub(crate) fn send_https(mut self) -> Result<ResponseLazy, Error> {
         self.request.host = ensure_ascii_host(self.request.host)?;
         let bytes = self.request.as_bytes();
-        let mut timeout_duration = self.timeout.map(|d| Duration::from_secs(d));
-        let timeout_at = timeout_duration.map(|d| Instant::now() + d);
 
         // Rustls setup
+        log::trace!("Setting up TLS parameters for {}.", self.request.host);
         let dns_name = &self.request.host;
         // parse_url in response.rs ensures that there is always a
         // ":port" in the host, which is why this unwrap is safe.
@@ -122,19 +138,20 @@ impl Connection {
         };
         let sess = ClientSession::new(&CONFIG, dns_name);
 
-        let tcp = self.connect(timeout_duration)?;
-
-        // Connect phase may have taken spend some time. so, calibrating the timeout.
-        calibrate_timeout(&mut timeout_duration, timeout_at)?;
+        log::trace!("Establishing TCP connection to {}.", self.request.host);
+        let tcp = self.connect(self.timeout()?)?;
 
         // Send request
-        let mut tls = StreamOwned::new(sess, tcp);
+        log::trace!("Establishing TLS session to {}.", self.request.host);
+        let mut tls = StreamOwned::new(sess, tcp); // I don't think this actually does any communication.
+        log::trace!("Writing HTTPS request to {}.", self.request.host);
         // The connection could drop mid-write, so set a timeout
-        tls.get_ref().set_write_timeout(timeout_duration).ok();
+        let _ = tls.get_ref().set_write_timeout(self.timeout()?);
         tls.write(&bytes)?;
 
         // Receive request
-        let response = ResponseLazy::from_stream(HttpStream::create_secured(tls, timeout_at))?;
+        log::trace!("Reading HTTPS response from {}.", self.request.host);
+        let response = ResponseLazy::from_stream(HttpStream::create_secured(tls, self.timeout_at))?;
         handle_redirects(self, response)
     }
 
@@ -144,9 +161,8 @@ impl Connection {
     pub(crate) fn send_https(mut self) -> Result<ResponseLazy, Error> {
         self.request.host = ensure_ascii_host(self.request.host)?;
         let bytes = self.request.as_bytes();
-        let mut timeout_duration = self.timeout.map(|d| Duration::from_secs(d));
-        let timeout_at = timeout_duration.map(|d| Instant::now() + d);
 
+        log::trace!("Setting up TLS parameters for {}.", self.request.host);
         let dns_name = &self.request.host;
         // parse_url in response.rs ensures that there is always a
         // ":port" in the host, which is why this unwrap is safe.
@@ -161,22 +177,23 @@ impl Connection {
             Err(err) => return Err(Error::IoError(io::Error::new(io::ErrorKind::Other, err))),
         };
 
-        let tcp = self.connect(timeout_duration)?;
-
-        // Connect phase may have taken spend some time. so, calibrating the timeout.
-        calibrate_timeout(&mut timeout_duration, timeout_at)?;
+        log::trace!("Establishing TCP connection to {}.", self.request.host);
+        let tcp = self.connect(self.timeout()?)?;
 
         // Send request
+        log::trace!("Establishing TLS session to {}.", self.request.host);
         let mut tls = match sess.connect(dns_name, tcp) {
             Ok(tls) => tls,
             Err(err) => return Err(Error::IoError(io::Error::new(io::ErrorKind::Other, err))),
         };
         // The connection could drop mid-write, so set a timeout
-        tls.get_ref().set_write_timeout(timeout_duration).ok();
+        log::trace!("Writing HTTPS request to {}.", self.request.host);
+        let _ = tls.get_ref().set_write_timeout(self.timeout()?);
         tls.write(&bytes)?;
 
         // Receive request
-        let response = ResponseLazy::from_stream(HttpStream::create_secured(tls, timeout_at))?;
+        log::trace!("Reading HTTPS response from {}.", self.request.host);
+        let response = ResponseLazy::from_stream(HttpStream::create_secured(tls, self.timeout_at))?;
         handle_redirects(self, response)
     }
 
@@ -185,20 +202,18 @@ impl Connection {
     pub(crate) fn send(mut self) -> Result<ResponseLazy, Error> {
         self.request.host = ensure_ascii_host(self.request.host)?;
         let bytes = self.request.as_bytes();
-        let mut timeout_duration = self.timeout.map(Duration::from_secs);
-        let timeout_at = timeout_duration.map(|d| Instant::now() + d);
 
-        let tcp = self.connect(timeout_duration)?;
-
-        // Connect phase may have taken spend some time. so, calibrating the timeout.
-        calibrate_timeout(&mut timeout_duration, timeout_at)?;
+        log::trace!("Establishing TCP connection to {}.", self.request.host);
+        let tcp = self.connect(self.timeout()?)?;
 
         // Send request
+        log::trace!("Writing HTTP request.");
         let mut stream = BufWriter::new(tcp);
-        stream.get_ref().set_write_timeout(timeout_duration).ok();
+        let _ = stream.get_ref().set_write_timeout(self.timeout()?);
         stream.write_all(&bytes)?;
 
         // Receive response
+        log::trace!("Reading HTTP response.");
         let tcp = match stream.into_inner() {
             Ok(tcp) => tcp,
             Err(_) => {
@@ -207,7 +222,7 @@ impl Connection {
                 ));
             }
         };
-        let stream = HttpStream::create_unsecured(BufReader::new(tcp), timeout_at);
+        let stream = HttpStream::create_unsecured(BufReader::new(tcp), self.timeout_at);
         let response = ResponseLazy::from_stream(stream)?;
         handle_redirects(self, response)
     }
@@ -265,13 +280,11 @@ fn handle_redirects(connection: Connection, response: ResponseLazy) -> Result<Re
     let url = response.headers.get("location");
     if let Some(connection) = get_redirect(connection, status_code, url) {
         let connection = connection?;
-        // TODO: Fix connection.timeout for redirected requests.
-        #[cfg(not(any(feature = "rustls", feature = "openssl", feature = "native-tls")))]
         if connection.request.https {
+            #[cfg(not(any(feature = "rustls", feature = "openssl", feature = "native-tls")))]
             return Err(Error::HttpsFeatureNotEnabled);
-        }
-        if connection.request.https {
-            connection.send_https()
+            #[cfg(any(feature = "rustls", feature = "openssl", feature = "native-tls"))]
+            return connection.send_https();
         } else {
             connection.send()
         }
@@ -291,7 +304,7 @@ fn get_redirect(
                 Some(url) => url,
                 None => return Some(Err(Error::RedirectLocationMissing)),
             };
-            log::debug!("Redirecting to: {}", url);
+            log::debug!("Redirecting ({}) to: {}", status_code, url);
 
             match connection.request.redirect_to(url.clone()) {
                 Ok(()) => {
@@ -341,22 +354,4 @@ fn ensure_ascii_host(host: String) -> Result<String, Error> {
             Ok(result)
         }
     }
-}
-
-fn calibrate_timeout(
-    timeout: &mut Option<Duration>,
-    timeout_at: Option<Instant>,
-) -> Result<(), Error> {
-    if let (Some(timeout), Some(timeout_at)) = (timeout, timeout_at) {
-        if let Some(balance_time) = timeout_at.checked_duration_since(Instant::now()) {
-            *timeout = balance_time;
-        } else {
-            return Err(Error::IoError(io::Error::new(
-                io::ErrorKind::TimedOut,
-                "the request's timeout was reached during the initial connection",
-            )));
-        }
-    }
-
-    Ok(())
 }
