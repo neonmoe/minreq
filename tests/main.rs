@@ -8,6 +8,7 @@ use self::setup::*;
 use std::io;
 
 #[test]
+#[cfg(any(feature = "rustls", feature = "openssl", feature = "native-tls"))]
 // Test based on issue #23: https://github.com/neonmoe/minreq/issues/23
 fn test_headers_char_boundary_panic() {
     minreq::get("http://iheartradio.com").send().unwrap();
