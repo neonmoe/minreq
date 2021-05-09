@@ -4,6 +4,14 @@
 //! minimal API, so you'll probably know everything you need to after
 //! reading a few examples.
 //!
+//! Note: as a minimal library, minreq has been written with the
+//! assumption that servers are well-behaved. This means that there is
+//! little error-correction for incoming data, which may cause some
+//! requests to fail unexpectedly. If you're writing an application or
+//! library that connects to servers you can't test beforehand,
+//! consider using a more robust library, such as
+//! [curl](https://crates.io/crates/curl).
+//!
 //! # Additional features
 //!
 //! Since the crate is supposed to be minimal in terms of

@@ -209,7 +209,8 @@ fn test_patch() {
 
 #[test]
 fn tcp_connect_timeout() {
-    let resp = minreq::Request::new(minreq::Method::Get, "http://54.158.248.248:91")
+    let _listener = std::net::TcpListener::bind("127.0.0.1:32162").unwrap();
+    let resp = minreq::Request::new(minreq::Method::Get, "http://127.0.0.1:32162")
         .with_timeout(1)
         .send();
     assert!(resp.is_err());
@@ -219,7 +220,7 @@ fn tcp_connect_timeout() {
             "{:?}",
             minreq::Error::IoError(io::Error::new(
                 io::ErrorKind::TimedOut,
-                "connection timed out"
+                "the timeout of the request was reached"
             ))
         )
     );

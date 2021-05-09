@@ -50,15 +50,19 @@ impl HttpStream {
     }
 }
 
+fn timeout_err() -> io::Error {
+    io::Error::new(
+        io::ErrorKind::TimedOut,
+        "the timeout of the request was reached",
+    )
+}
+
 fn timeout_at_to_duration(timeout_at: Option<Instant>) -> Result<Option<Duration>, io::Error> {
     if let Some(timeout_at) = timeout_at {
         if let Some(duration) = timeout_at.checked_duration_since(Instant::now()) {
             Ok(Some(duration))
         } else {
-            Err(io::Error::new(
-                io::ErrorKind::TimedOut,
-                "The request's timeout was reached.",
-            ))
+            Err(timeout_err())
         }
     } else {
         Ok(None)
@@ -116,130 +120,135 @@ impl Connection {
     ///
     /// The Result will be Err if the timeout has already passed.
     fn timeout(&self) -> Result<Option<Duration>, io::Error> {
-        timeout_at_to_duration(self.timeout_at)
+        let timeout = timeout_at_to_duration(self.timeout_at);
+        log::trace!("Timeout requested, it is currently: {:?}", timeout);
+        timeout
     }
 
     /// Sends the [`Request`](struct.Request.html), consumes this
     /// connection, and returns a [`Response`](struct.Response.html).
     #[cfg(feature = "rustls")]
     pub(crate) fn send_https(mut self) -> Result<ResponseLazy, Error> {
-        self.request.host = ensure_ascii_host(self.request.host)?;
-        let bytes = self.request.as_bytes();
+        enforce_timeout(self.timeout_at, move || {
+            self.request.host = ensure_ascii_host(self.request.host)?;
+            let bytes = self.request.as_bytes();
 
-        // Rustls setup
-        log::trace!("Setting up TLS parameters for {}.", self.request.host);
-        let dns_name = &self.request.host;
-        // parse_url in response.rs ensures that there is always a
-        // ":port" in the host, which is why this unwrap is safe.
-        let dns_name = dns_name.split(':').next().unwrap();
-        let dns_name = match DNSNameRef::try_from_ascii_str(dns_name) {
-            Ok(result) => result,
-            Err(err) => return Err(Error::IoError(io::Error::new(io::ErrorKind::Other, err))),
-        };
-        let sess = ClientSession::new(&CONFIG, dns_name);
+            // Rustls setup
+            log::trace!("Setting up TLS parameters for {}.", self.request.host);
+            let dns_name = &self.request.host;
+            // parse_url in response.rs ensures that there is always a
+            // ":port" in the host, which is why this unwrap is safe.
+            let dns_name = dns_name.split(':').next().unwrap();
+            let dns_name = match DNSNameRef::try_from_ascii_str(dns_name) {
+                Ok(result) => result,
+                Err(err) => return Err(Error::IoError(io::Error::new(io::ErrorKind::Other, err))),
+            };
+            let sess = ClientSession::new(&CONFIG, dns_name);
 
-        log::trace!("Establishing TCP connection to {}.", self.request.host);
-        let tcp = self.connect(self.timeout()?)?;
+            log::trace!("Establishing TCP connection to {}.", self.request.host);
+            let tcp = self.connect()?;
 
-        // Send request
-        log::trace!("Establishing TLS session to {}.", self.request.host);
-        let mut tls = StreamOwned::new(sess, tcp); // I don't think this actually does any communication.
-        log::trace!("Writing HTTPS request to {}.", self.request.host);
-        // The connection could drop mid-write, so set a timeout
-        let _ = tls.get_ref().set_write_timeout(self.timeout()?);
-        tls.write(&bytes)?;
+            // Send request
+            log::trace!("Establishing TLS session to {}.", self.request.host);
+            let mut tls = StreamOwned::new(sess, tcp); // I don't think this actually does any communication.
+            log::trace!("Writing HTTPS request to {}.", self.request.host);
+            let _ = tls.get_ref().set_write_timeout(self.timeout()?);
+            tls.write(&bytes)?;
 
-        // Receive request
-        log::trace!("Reading HTTPS response from {}.", self.request.host);
-        let response = ResponseLazy::from_stream(HttpStream::create_secured(tls, self.timeout_at))?;
-        handle_redirects(self, response)
+            // Receive request
+            log::trace!("Reading HTTPS response from {}.", self.request.host);
+            let response =
+                ResponseLazy::from_stream(HttpStream::create_secured(tls, self.timeout_at))?;
+            handle_redirects(self, response)
+        })
     }
 
     /// Sends the [`Request`](struct.Request.html), consumes this
     /// connection, and returns a [`Response`](struct.Response.html).
     #[cfg(any(feature = "openssl", feature = "native-tls"))]
     pub(crate) fn send_https(mut self) -> Result<ResponseLazy, Error> {
-        self.request.host = ensure_ascii_host(self.request.host)?;
-        let bytes = self.request.as_bytes();
+        enforce_timeout(self.timeout_at, move || {
+            self.request.host = ensure_ascii_host(self.request.host)?;
+            let bytes = self.request.as_bytes();
 
-        log::trace!("Setting up TLS parameters for {}.", self.request.host);
-        let dns_name = &self.request.host;
-        // parse_url in response.rs ensures that there is always a
-        // ":port" in the host, which is why this unwrap is safe.
-        let dns_name = dns_name.split(':').next().unwrap();
-        /*
-        let mut builder = TlsConnector::builder();
-        ...
-        let sess = match builder.build() {
-        */
-        let sess = match TlsConnector::new() {
-            Ok(sess) => sess,
-            Err(err) => return Err(Error::IoError(io::Error::new(io::ErrorKind::Other, err))),
-        };
+            log::trace!("Setting up TLS parameters for {}.", self.request.host);
+            let dns_name = &self.request.host;
+            // parse_url in response.rs ensures that there is always a
+            // ":port" in the host, which is why this unwrap is safe.
+            let dns_name = dns_name.split(':').next().unwrap();
+            /*
+            let mut builder = TlsConnector::builder();
+            ...
+            let sess = match builder.build() {
+            */
+            let sess = match TlsConnector::new() {
+                Ok(sess) => sess,
+                Err(err) => return Err(Error::IoError(io::Error::new(io::ErrorKind::Other, err))),
+            };
 
-        log::trace!("Establishing TCP connection to {}.", self.request.host);
-        let tcp = self.connect(self.timeout()?)?;
+            log::trace!("Establishing TCP connection to {}.", self.request.host);
+            let tcp = self.connect()?;
 
-        // Send request
-        log::trace!("Establishing TLS session to {}.", self.request.host);
-        let mut tls = match sess.connect(dns_name, tcp) {
-            Ok(tls) => tls,
-            Err(err) => return Err(Error::IoError(io::Error::new(io::ErrorKind::Other, err))),
-        };
-        // The connection could drop mid-write, so set a timeout
-        log::trace!("Writing HTTPS request to {}.", self.request.host);
-        let _ = tls.get_ref().set_write_timeout(self.timeout()?);
-        tls.write(&bytes)?;
+            // Send request
+            log::trace!("Establishing TLS session to {}.", self.request.host);
+            let mut tls = match sess.connect(dns_name, tcp) {
+                Ok(tls) => tls,
+                Err(err) => return Err(Error::IoError(io::Error::new(io::ErrorKind::Other, err))),
+            };
+            log::trace!("Writing HTTPS request to {}.", self.request.host);
+            let _ = tls.get_ref().set_write_timeout(self.timeout()?);
+            tls.write(&bytes)?;
 
-        // Receive request
-        log::trace!("Reading HTTPS response from {}.", self.request.host);
-        let response = ResponseLazy::from_stream(HttpStream::create_secured(tls, self.timeout_at))?;
-        handle_redirects(self, response)
+            // Receive request
+            log::trace!("Reading HTTPS response from {}.", self.request.host);
+            let response =
+                ResponseLazy::from_stream(HttpStream::create_secured(tls, self.timeout_at))?;
+            handle_redirects(self, response)
+        })
     }
 
     /// Sends the [`Request`](struct.Request.html), consumes this
     /// connection, and returns a [`Response`](struct.Response.html).
     pub(crate) fn send(mut self) -> Result<ResponseLazy, Error> {
-        self.request.host = ensure_ascii_host(self.request.host)?;
-        let bytes = self.request.as_bytes();
+        enforce_timeout(self.timeout_at, move || {
+            self.request.host = ensure_ascii_host(self.request.host)?;
+            let bytes = self.request.as_bytes();
 
-        log::trace!("Establishing TCP connection to {}.", self.request.host);
-        let tcp = self.connect(self.timeout()?)?;
+            log::trace!("Establishing TCP connection to {}.", self.request.host);
+            let tcp = self.connect()?;
 
-        // Send request
-        log::trace!("Writing HTTP request.");
-        let mut stream = BufWriter::new(tcp);
-        let _ = stream.get_ref().set_write_timeout(self.timeout()?);
-        stream.write_all(&bytes)?;
+            // Send request
+            log::trace!("Writing HTTP request.");
+            let mut stream = BufWriter::new(tcp);
+            let _ = stream.get_ref().set_write_timeout(self.timeout()?);
+            stream.write_all(&bytes)?;
 
-        // Receive response
-        log::trace!("Reading HTTP response.");
-        let tcp = match stream.into_inner() {
-            Ok(tcp) => tcp,
-            Err(_) => {
-                return Err(Error::Other(
-                    "IntoInnerError after writing the request into the TcpStream.",
-                ));
-            }
-        };
-        let stream = HttpStream::create_unsecured(BufReader::new(tcp), self.timeout_at);
-        let response = ResponseLazy::from_stream(stream)?;
-        handle_redirects(self, response)
+            // Receive response
+            log::trace!("Reading HTTP response.");
+            let tcp = match stream.into_inner() {
+                Ok(tcp) => tcp,
+                Err(_) => {
+                    return Err(Error::Other(
+                        "IntoInnerError after writing the request into the TcpStream.",
+                    ));
+                }
+            };
+            let stream = HttpStream::create_unsecured(BufReader::new(tcp), self.timeout_at);
+            let response = ResponseLazy::from_stream(stream)?;
+            handle_redirects(self, response)
+        })
     }
 
-    fn connect(&self, timeout: Option<Duration>) -> Result<TcpStream, Error> {
+    fn connect(&self) -> Result<TcpStream, Error> {
         let tcp_connect = |host: &str| -> Result<TcpStream, Error> {
-            if let Some(timeout) = timeout {
-                let sock_address = host
-                    .to_socket_addrs()
-                    .map_err(Error::IoError)?
-                    .next()
-                    .ok_or(Error::Other("failed to lookup address information"))?;
+            let mut addrs = host.to_socket_addrs().map_err(Error::IoError)?;
+            let sock_address = addrs.next().ok_or(Error::AddressNotFound)?;
+            let stream = if let Some(timeout) = self.timeout()? {
                 TcpStream::connect_timeout(&sock_address, timeout)
             } else {
-                TcpStream::connect(host)
-            }
-            .map_err(Error::from)
+                TcpStream::connect(&sock_address)
+            };
+            stream.map_err(Error::from)
         };
 
         #[cfg(feature = "proxy")]
@@ -353,5 +362,44 @@ fn ensure_ascii_host(host: String) -> Result<String, Error> {
             result.truncate(result.len() - 1); // Remove the trailing dot
             Ok(result)
         }
+    }
+}
+
+/// Enforce the timeout by running the function in a new thread and
+/// parking the current one with a timeout.
+///
+/// While minreq does use timeouts (somewhat) properly, some
+/// interfaces such as [ToSocketAddrs] don't allow for specifying the
+/// timeout. Hence this.
+fn enforce_timeout<F, R>(timeout_at: Option<Instant>, f: F) -> Result<R, Error>
+where
+    F: 'static + Send + FnOnce() -> Result<R, Error>,
+    R: 'static + Send,
+{
+    use std::sync::mpsc::{channel, RecvTimeoutError};
+
+    match timeout_at {
+        Some(deadline) => {
+            let (sender, receiver) = channel();
+            let thread = std::thread::spawn(move || {
+                let result = f();
+                let _ = sender.send(());
+                result
+            });
+            if let Some(timeout_duration) = deadline.checked_duration_since(Instant::now()) {
+                match receiver.recv_timeout(timeout_duration) {
+                    Ok(()) => thread.join().unwrap(),
+                    Err(err) => match err {
+                        RecvTimeoutError::Timeout => Err(Error::IoError(timeout_err())),
+                        RecvTimeoutError::Disconnected => {
+                            Err(Error::Other("request connection paniced"))
+                        }
+                    },
+                }
+            } else {
+                Err(Error::IoError(timeout_err()))
+            }
+        }
+        None => f(),
     }
 }

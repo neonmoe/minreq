@@ -18,6 +18,9 @@ pub enum Error {
     /// Couldn't parse the `Content-Length` header's value as an
     /// `usize`.
     MalformedContentLength,
+    /// [ToSocketAddrs](std::net::ToSocketAddrs) did not resolve to an
+    /// address.
+    AddressNotFound,
     /// The response was a redirection, but the `Location` header is
     /// missing.
     RedirectLocationMissing,
@@ -71,6 +74,7 @@ impl fmt::Display for Error {
 
             MalformedChunkLength => write!(f, "non-usize chunk length with transfer-encoding: chunked"),
             MalformedContentLength => write!(f, "non-usize content length"),
+            AddressNotFound => write!(f, "could not resolve host to a socket address"),
             RedirectLocationMissing => write!(f, "redirection location header missing"),
             InfiniteRedirectionLoop => write!(f, "infinite redirection loop detected"),
             TooManyRedirections => write!(f, "too many redirections (over the max)"),
