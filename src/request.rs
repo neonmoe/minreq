@@ -120,21 +120,20 @@ impl Request {
         self.with_header("Content-Length", format!("{}", body_length))
     }
 
-    /// Adds given key and value as query parameter to request url (resource).
-    pub fn with_param<T: Into<String>, U: Into<String>>(mut self, key: T, value: U) ->Result<Request, Error> {
-
-        // Checks if the resource already has a query parameter 
-        // mentioned in url and if true, adds '&' to add one more 
+    /// Adds given key and value as query parameter to request url
+    /// (resource).
+    pub fn with_param<T: Into<String>, U: Into<String>>(mut self, key: T, value: U) -> Request {
+        // Checks if the resource already has a query parameter
+        // mentioned in url and if true, adds '&' to add one more
         // parameter or adds '?' to add the first parameter
         if self.resource.contains("?") {
             self.resource.push('&');
         } else {
             self.resource.push('?');
-        } 
-
-        self.resource.push_str(&format!("{}={}", key.into(), value.into()));
-
-        Ok(self)
+        }
+        self.resource
+            .push_str(&format!("{}={}", key.into(), value.into()));
+        self
     }
 
     /// Converts given argument to JSON and sets it as body.
