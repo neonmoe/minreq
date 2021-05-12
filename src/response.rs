@@ -210,17 +210,23 @@ pub struct ResponseLazy {
 
     stream: Bytes<HttpStream>,
     state: HttpStreamState,
+    max_trailing_headers_size: Option<usize>,
 }
 
 impl ResponseLazy {
-    pub(crate) fn from_stream(stream: HttpStream) -> Result<ResponseLazy, Error> {
+    pub(crate) fn from_stream(
+        stream: HttpStream,
+        max_headers_size: Option<usize>,
+        max_status_line_len: Option<usize>,
+    ) -> Result<ResponseLazy, Error> {
         let mut stream = stream.bytes();
         let ResponseMetadata {
             status_code,
             reason_phrase,
             headers,
             state,
-        } = read_metadata(&mut stream)?;
+            max_trailing_headers_size,
+        } = read_metadata(&mut stream, max_headers_size, max_status_line_len)?;
 
         Ok(ResponseLazy {
             status_code,
@@ -228,6 +234,7 @@ impl ResponseLazy {
             headers,
             stream,
             state,
+            max_trailing_headers_size,
         })
     }
 }
@@ -247,6 +254,7 @@ impl Iterator for ResponseLazy {
                     expecting_chunks,
                     length,
                     content_length,
+                    self.max_trailing_headers_size,
                 )
             }
         }
@@ -284,9 +292,13 @@ fn read_with_content_length(
 fn read_trailers(
     bytes: &mut Bytes<HttpStream>,
     headers: &mut HashMap<String, String>,
+    mut max_headers_size: Option<usize>,
 ) -> Result<(), Error> {
     loop {
-        let trailer_line = read_line(bytes)?;
+        let trailer_line = read_line(bytes, max_headers_size, Error::HeadersOverflow)?;
+        if let Some(ref mut max_headers_size) = max_headers_size {
+            *max_headers_size -= trailer_line.len() + 2;
+        }
         if let Some((header, value)) = parse_header(trailer_line) {
             headers.insert(header, value);
         } else {
@@ -302,14 +314,19 @@ fn read_chunked(
     expecting_more_chunks: &mut bool,
     chunk_length: &mut usize,
     content_length: &mut usize,
+    max_trailing_headers_size: Option<usize>,
 ) -> Option<<ResponseLazy as Iterator>::Item> {
     if !*expecting_more_chunks && *chunk_length == 0 {
         return None;
     }
 
     if *chunk_length == 0 {
+        // Max length of the chunk length line is 1KB: not too long to
+        // take up much memory, long enough to tolerate some chunk
+        // extensions (which are ignored).
+
         // Get the size of the next chunk
-        let length_line = match read_line(bytes) {
+        let length_line = match read_line(bytes, Some(1024), Error::MalformedChunkLength) {
             Ok(line) => line,
             Err(err) => return Some(Err(err)),
         };
@@ -320,14 +337,19 @@ fn read_chunked(
         let incoming_length = if length_line.is_empty() {
             0
         } else {
-            match usize::from_str_radix(length_line.trim(), 16) {
+            let length = if let Some(i) = length_line.find(";") {
+                length_line[..i].trim()
+            } else {
+                length_line.trim()
+            };
+            match usize::from_str_radix(length, 16) {
                 Ok(length) => length,
                 Err(_) => return Some(Err(Error::MalformedChunkLength)),
             }
         };
 
         if incoming_length == 0 {
-            if let Err(err) = read_trailers(bytes, headers) {
+            if let Err(err) = read_trailers(bytes, headers, max_trailing_headers_size) {
                 return Some(Err(err));
             }
 
@@ -353,7 +375,7 @@ fn read_chunked(
                         // TODO: Maybe this could be written in a way
                         // that doesn't discard the last ok byte if
                         // the \r\n reading fails?
-                        if let Err(err) = read_line(bytes) {
+                        if let Err(err) = read_line(bytes, Some(2), Error::MalformedChunkEnd) {
                             return Some(Err(err));
                         }
                     }
@@ -392,17 +414,26 @@ struct ResponseMetadata {
     reason_phrase: String,
     headers: HashMap<String, String>,
     state: HttpStreamState,
+    max_trailing_headers_size: Option<usize>,
 }
 
-fn read_metadata(stream: &mut Bytes<HttpStream>) -> Result<ResponseMetadata, Error> {
-    let (status_code, reason_phrase) = parse_status_line(&read_line(stream)?);
+fn read_metadata(
+    stream: &mut Bytes<HttpStream>,
+    mut max_headers_size: Option<usize>,
+    max_status_line_len: Option<usize>,
+) -> Result<ResponseMetadata, Error> {
+    let line = read_line(stream, max_status_line_len, Error::StatusLineOverflow)?;
+    let (status_code, reason_phrase) = parse_status_line(&line);
 
     let mut headers = HashMap::new();
     loop {
-        let line = read_line(stream)?;
+        let line = read_line(stream, max_headers_size, Error::HeadersOverflow)?;
         if line.is_empty() {
             // Body starts here
             break;
+        }
+        if let Some(ref mut max_headers_size) = max_headers_size {
+            *max_headers_size -= line.len() + 2;
         }
         if let Some(header) = parse_header(line) {
             headers.insert(header.0, header.1);
@@ -441,16 +472,27 @@ fn read_metadata(stream: &mut Bytes<HttpStream>) -> Result<ResponseMetadata, Err
         reason_phrase,
         headers,
         state,
+        max_trailing_headers_size: max_headers_size,
     })
 }
 
-fn read_line(stream: &mut Bytes<HttpStream>) -> Result<String, Error> {
+fn read_line(
+    stream: &mut Bytes<HttpStream>,
+    max_len: Option<usize>,
+    overflow_error: Error,
+) -> Result<String, Error> {
     let mut bytes = Vec::with_capacity(32);
     for byte in stream {
         let byte = byte?;
+        if let Some(max_len) = max_len {
+            if bytes.len() >= max_len {
+                return Err(overflow_error);
+            }
+        }
         if byte == b'\n' {
-            // Pop the \r off, as HTTP lines end in \r\n.
-            bytes.pop();
+            if let Some(b'\r') = bytes.last() {
+                bytes.pop();
+            }
             break;
         } else {
             bytes.push(byte);

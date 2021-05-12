@@ -15,9 +15,18 @@ pub enum Error {
     /// Couldn't parse the incoming chunk's length while receiving a
     /// response with the header `Transfer-Encoding: chunked`.
     MalformedChunkLength,
+    /// The chunk did not end after reading the previously read amount
+    /// of bytes.
+    MalformedChunkEnd,
     /// Couldn't parse the `Content-Length` header's value as an
     /// `usize`.
     MalformedContentLength,
+    /// The response contains headers whose total size surpasses
+    /// [Request::with_max_headers_size](crate::request::Request::with_max_headers_size).
+    HeadersOverflow,
+    /// The response's status line length surpasses
+    /// [Request::with_max_status_line_size](crate::request::Request::with_max_status_line_length).
+    StatusLineOverflow,
     /// [ToSocketAddrs](std::net::ToSocketAddrs) did not resolve to an
     /// address.
     AddressNotFound,
@@ -73,7 +82,10 @@ impl fmt::Display for Error {
             InvalidUtf8InBody(err) => write!(f, "{}", err),
 
             MalformedChunkLength => write!(f, "non-usize chunk length with transfer-encoding: chunked"),
+            MalformedChunkEnd => write!(f, "chunk did not end after reading the expected amount of bytes"),
             MalformedContentLength => write!(f, "non-usize content length"),
+            HeadersOverflow => write!(f, "the headers' total size surpassed max_headers_size"),
+            StatusLineOverflow => write!(f, "the status line length surpassed max_status_line_length"),
             AddressNotFound => write!(f, "could not resolve host to a socket address"),
             RedirectLocationMissing => write!(f, "redirection location header missing"),
             InfiniteRedirectionLoop => write!(f, "infinite redirection loop detected"),

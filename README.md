@@ -30,6 +30,10 @@ major version bump.
 
 - Change the response/request structs to allow multiple headers with
   the same name.
+- Set sane defaults for maximum header size and status line
+  length. The ability to add maximums was added in response to
+  [#55](https://github.com/neonmoe/minreq/issues/55), but defaults for
+  the limits is a breaking change.
 
 ## License
 This crate is distributed under the terms of the [ISC license](COPYING.md).

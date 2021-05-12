@@ -76,6 +76,8 @@ pub struct Request {
     headers: HashMap<String, String>,
     body: Option<Vec<u8>>,
     pub(crate) timeout: Option<u64>,
+    pub(crate) max_headers_size: Option<usize>,
+    pub(crate) max_status_line_len: Option<usize>,
     max_redirects: usize,
     pub(crate) https: bool,
     pub(crate) redirects: Vec<(bool, URL, URL)>,
@@ -97,6 +99,8 @@ impl Request {
             headers: HashMap::new(),
             body: None,
             timeout: None,
+            max_headers_size: None,
+            max_status_line_len: None,
             max_redirects: 100,
             https,
             redirects: Vec::new(),
@@ -171,6 +175,48 @@ impl Request {
     /// becomes a problem, please open an issue.
     pub fn with_max_redirects(mut self, max_redirects: usize) -> Request {
         self.max_redirects = max_redirects;
+        self
+    }
+
+    /// Sets the maximum size of all the headers this request will
+    /// accept.
+    ///
+    /// If this limit is passed, the request will close the connection
+    /// and return an [Error::HeadersOverflow] error.
+    ///
+    /// The maximum length is counted in bytes, including line-endings
+    /// and other whitespace. Both normal and trailing headers count
+    /// towards this cap.
+    ///
+    /// `None` disables the cap, and may cause the program to use any
+    /// amount of memory if the server responds with a lot of headers
+    /// (or an infinite amount). In minreq versions 2.x.x, the default
+    /// is None, so setting this manually is recommended when talking
+    /// to untrusted servers.
+    pub fn with_max_headers_size<S: Into<Option<usize>>>(mut self, max_headers_size: S) -> Request {
+        self.max_headers_size = max_headers_size.into();
+        self
+    }
+
+    /// Sets the maximum length of the status line this request will
+    /// accept.
+    ///
+    /// If this limit is passed, the request will close the connection
+    /// and return an [Error::StatusLineOverflow] error.
+    ///
+    /// The maximum length is counted in bytes, including the
+    /// line-ending `\r\n`.
+    ///
+    /// `None` disables the cap, and may cause the program to use any
+    /// amount of memory if the server responds with a long (or
+    /// infinite) status line. In minreq versions 2.x.x, the default
+    /// is None, so setting this manually is recommended when talking
+    /// to untrusted servers.
+    pub fn with_max_status_line_length<S: Into<Option<usize>>>(
+        mut self,
+        max_status_line_len: S,
+    ) -> Request {
+        self.max_status_line_len = max_status_line_len.into();
         self
     }
 

@@ -157,8 +157,11 @@ impl Connection {
 
             // Receive request
             log::trace!("Reading HTTPS response from {}.", self.request.host);
-            let response =
-                ResponseLazy::from_stream(HttpStream::create_secured(tls, self.timeout_at))?;
+            let response = ResponseLazy::from_stream(
+                HttpStream::create_secured(tls, self.timeout_at),
+                self.request.max_headers_size,
+                self.request.max_status_line_len,
+            )?;
             handle_redirects(self, response)
         })
     }
@@ -201,8 +204,11 @@ impl Connection {
 
             // Receive request
             log::trace!("Reading HTTPS response from {}.", self.request.host);
-            let response =
-                ResponseLazy::from_stream(HttpStream::create_secured(tls, self.timeout_at))?;
+            let response = ResponseLazy::from_stream(
+                HttpStream::create_secured(tls, self.timeout_at),
+                self.request.max_headers_size,
+                self.request.max_status_line_len,
+            )?;
             handle_redirects(self, response)
         })
     }
@@ -234,7 +240,11 @@ impl Connection {
                 }
             };
             let stream = HttpStream::create_unsecured(BufReader::new(tcp), self.timeout_at);
-            let response = ResponseLazy::from_stream(stream)?;
+            let response = ResponseLazy::from_stream(
+                stream,
+                self.request.max_headers_size,
+                self.request.max_status_line_len,
+            )?;
             handle_redirects(self, response)
         })
     }

@@ -9,11 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Request::with_param` for more ergonomic query parameter
   usage. Thanks for the PR, @sjvignesh!
   ([#54](https://github.com/neonmoe/minreq/pull/54))
+- `Request::with_max_headers_size` and
+  `Request::with_max_status_line_length` for avoiding DoS when the
+  server sends large headers or status lines. Thanks for the report,
+  @Shnatsel! ([#55](https://github.com/neonmoe/minreq/issues/55))
 
 ### Fixed
 - Chunk length handling for some servers with slightly off-spec chunk
   lengths. Thanks for the report, @Shnatsel!
   ([#50](https://github.com/neonmoe/minreq/issues/50))
+- Timeouts not always being properly enforced. Thanks for the report,
+  @Shnatsel! ([#52](https://github.com/neonmoe/minreq/issues/52))
 
 ## [2.3.1] - 2021-02-10
 ### Fixed

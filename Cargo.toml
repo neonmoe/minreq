@@ -1,6 +1,6 @@
 [package]
 name = "minreq"
-version = "2.3.2-alpha.0"
+version = "2.4.0-alpha.0"
 authors = ["Jens Pitkanen <jens@neon.moe>"]
 description = "Simple, minimal-dependency HTTP client"
 documentation = "https://docs.rs/minreq"
@@ -35,7 +35,7 @@ openssl-probe = { version = "0.1", optional = true }
 native-tls = { version = "0.2", optional = true }
 
 [dev-dependencies]
-tiny_http = "^0.6.2"
+tiny_http = "^0.8.2"
 serde_derive = "^1.0.101"
 env_logger = "^0.8.3"
 

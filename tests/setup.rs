@@ -1,8 +1,8 @@
 extern crate minreq;
 extern crate tiny_http;
 use self::tiny_http::{Header, Method, Response, Server};
-use std::sync::Arc;
-use std::sync::Once;
+use std::str::FromStr;
+use std::sync::{Arc, Once};
 use std::thread;
 use std::time::Duration;
 
@@ -55,13 +55,23 @@ pub fn setup() {
                         request.respond(response).ok();
                     }
 
+                    Method::Get if url == "/long_header" => {
+                        let mut long_header = String::with_capacity(1000);
+                        long_header += "Very-Long-Header: ";
+                        for _ in 0..1000 - long_header.len() {
+                            long_header += ".";
+                        }
+                        let long_header = Header::from_str(&long_header).unwrap();
+                        let response = Response::empty(200).with_header(long_header);
+                        request.respond(response).ok();
+                    }
+                    Method::Get if url == "/long_status_line" => {
+                        request.respond(Response::empty(203)).ok();
+                    }
+
                     Method::Get if url == "/redirect-baz" => {
                         let response = Response::empty(301).with_header(
-                            Header::from_bytes(
-                                &b"Location"[..],
-                                &b"http://localhost:35562/a#baz"[..],
-                            )
-                            .unwrap(),
+                            Header::from_str("Location: http://localhost:35562/a#baz").unwrap(),
                         );
                         request.respond(response).ok();
                     }

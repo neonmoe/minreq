@@ -225,3 +225,41 @@ fn tcp_connect_timeout() {
         )
     );
 }
+
+#[test]
+fn test_header_cap() {
+    setup();
+    let body = minreq::get(url("/long_header"))
+        .with_max_headers_size(999)
+        .send();
+    assert!(body.is_err());
+    assert_eq!(
+        format!("{:?}", body.err().unwrap()),
+        format!("{:?}", minreq::Error::HeadersOverflow)
+    );
+
+    let body = minreq::get(url("/long_header"))
+        .with_max_headers_size(1500)
+        .send();
+    assert!(body.is_ok());
+}
+
+#[test]
+fn test_status_line_cap() {
+    setup();
+    let expected_status_line = "HTTP/1.1 203 Non-Authoritative Information";
+
+    let body = minreq::get(url("/long_status_line"))
+        .with_max_status_line_length(expected_status_line.len() + 1)
+        .send();
+    assert!(body.is_err());
+    assert_eq!(
+        format!("{:?}", body.err().unwrap()),
+        format!("{:?}", minreq::Error::StatusLineOverflow)
+    );
+
+    let body = minreq::get(url("/long_status_line"))
+        .with_max_status_line_length(expected_status_line.len() + 2)
+        .send();
+    assert!(body.is_ok());
+}
