@@ -3,6 +3,9 @@ use std::collections::HashMap;
 use std::io::{Bytes, Read};
 use std::str;
 
+/// Workaround because `&Vec<String>` does not implement `Default` 
+const NO_HEADER: &Vec<String> = &Vec::new();
+
 /// An HTTP response.
 ///
 /// Returned by [`Request::send`](struct.Request.html#method.send).
@@ -23,7 +26,7 @@ pub struct Response {
     pub reason_phrase: String,
     /// The headers of the response. The header field names (the
     /// keys) are all lowercase.
-    pub headers: HashMap<String, String>,
+    pub headers: HashMap<String, Vec<String>>,
 
     body: Vec<u8>,
 }
@@ -163,6 +166,46 @@ impl Response {
             Err(err) => Err(Error::SerdeJsonError(err)),
         }
     }
+
+    /// Returns the first value of the header with the given name.
+    /// The header names are all lowercase.
+    /// 
+    /// # Example
+    ///
+    /// ```no_run
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let url = "http://example.org/";
+    /// let response = minreq::get(url).send()?;
+    /// println!("{:?}", response.get_header("last-modified"));
+    /// # Ok(())
+    /// # }
+    /// ```
+    /// 
+    /// See also [get_headers](Self::get_headers).
+    pub fn get_header<'a>(&'a self, name: &str) -> Option<&'a String> {
+        self.headers.get(name).map(|values| values.get(0)).flatten()
+    }
+
+    /// Returns all the values of the header with the given name. 
+    /// The header names are all lowercase.
+    /// 
+    /// # Example
+    ///
+    /// ```no_run
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let url = "http://example.org/";
+    /// let response = minreq::get(url).send()?;
+    /// for cookie in response.get_headers("set-cookie") {
+    ///     println!("cookie: {}", cookie); 
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    /// 
+    /// See also [get_header](Self::get_header).
+    pub fn get_headers<'a>(&'a self, name: &str) -> &'a Vec<String> {
+        self.headers.get(name).unwrap_or(NO_HEADER)
+    }
 }
 
 /// An HTTP response, which is loaded lazily.
@@ -206,7 +249,7 @@ pub struct ResponseLazy {
     pub reason_phrase: String,
     /// The headers of the response. The header field names (the
     /// keys) are all lowercase.
-    pub headers: HashMap<String, String>,
+    pub headers: HashMap<String, Vec<String>>,
 
     stream: Bytes<HttpStream>,
     state: HttpStreamState,
@@ -236,6 +279,46 @@ impl ResponseLazy {
             state,
             max_trailing_headers_size,
         })
+    }
+
+    /// Returns the first value of the header with the given name.
+    /// The header names are all lowercase.
+    /// 
+    /// # Example
+    ///
+    /// ```no_run
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let url = "http://example.org/";
+    /// let response = minreq::get(url).send()?;
+    /// println!("{:?}", response.get_header("last-modified"));
+    /// # Ok(())
+    /// # }
+    /// ```
+    /// 
+    /// See also [get_headers](Self::get_headers).
+    pub fn get_header<'a>(&'a self, name: &str) -> Option<&'a String> {
+        self.headers.get(name).map(|values| values.get(0)).flatten()
+    }
+
+    /// Returns all the values of the header with the given name. 
+    /// The header names are all lowercase.
+    /// 
+    /// # Example
+    ///
+    /// ```no_run
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let url = "http://example.org/";
+    /// let response = minreq::get(url).send()?;
+    /// for cookie in response.get_headers("set-cookie") {
+    ///     println!("cookie: {}", cookie); 
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    /// 
+    /// See also [get_header](Self::get_header).
+    pub fn get_headers<'a>(&'a self, name: &str) -> &'a Vec<String> {
+        self.headers.get(name).unwrap_or(NO_HEADER)
     }
 }
 
@@ -291,7 +374,7 @@ fn read_with_content_length(
 
 fn read_trailers(
     bytes: &mut Bytes<HttpStream>,
-    headers: &mut HashMap<String, String>,
+    headers: &mut HashMap<String, Vec<String>>,
     mut max_headers_size: Option<usize>,
 ) -> Result<(), Error> {
     loop {
@@ -300,7 +383,7 @@ fn read_trailers(
             *max_headers_size -= trailer_line.len() + 2;
         }
         if let Some((header, value)) = parse_header(trailer_line) {
-            headers.insert(header, value);
+            headers.entry(header).or_default().push(value);
         } else {
             break;
         }
@@ -310,7 +393,7 @@ fn read_trailers(
 
 fn read_chunked(
     bytes: &mut Bytes<HttpStream>,
-    headers: &mut HashMap<String, String>,
+    headers: &mut HashMap<String, Vec<String>>,
     expecting_more_chunks: &mut bool,
     chunk_length: &mut usize,
     content_length: &mut usize,
@@ -337,7 +420,7 @@ fn read_chunked(
         let incoming_length = if length_line.is_empty() {
             0
         } else {
-            let length = if let Some(i) = length_line.find(";") {
+            let length = if let Some(i) = length_line.find(';') {
                 length_line[..i].trim()
             } else {
                 length_line.trim()
@@ -354,7 +437,7 @@ fn read_chunked(
             }
 
             *expecting_more_chunks = false;
-            headers.insert("content-length".to_string(), (*content_length).to_string());
+            headers.insert("content-length".to_string(), vec![(*content_length).to_string()]);
             headers.remove("transfer-encoding");
             return None;
         }
@@ -412,7 +495,7 @@ enum HttpStreamState {
 struct ResponseMetadata {
     status_code: i32,
     reason_phrase: String,
-    headers: HashMap<String, String>,
+    headers: HashMap<String, Vec<String>>,
     state: HttpStreamState,
     max_trailing_headers_size: Option<usize>,
 }
@@ -425,7 +508,7 @@ fn read_metadata(
     let line = read_line(stream, max_status_line_len, Error::StatusLineOverflow)?;
     let (status_code, reason_phrase) = parse_status_line(&line);
 
-    let mut headers = HashMap::new();
+    let mut headers: HashMap<_, Vec<_>> = HashMap::new();
     loop {
         let line = read_line(stream, max_headers_size, Error::HeadersOverflow)?;
         if line.is_empty() {
@@ -436,7 +519,7 @@ fn read_metadata(
             *max_headers_size -= line.len() + 2;
         }
         if let Some(header) = parse_header(line) {
-            headers.insert(header.0, header.1);
+            headers.entry(header.0).or_default().push(header.1);
         }
     }
 
@@ -445,14 +528,14 @@ fn read_metadata(
     for (header, value) in &headers {
         // Handle the Transfer-Encoding header
         if header.to_lowercase().trim() == "transfer-encoding"
-            && value.to_lowercase().trim() == "chunked"
+            && value[0].to_lowercase().trim() == "chunked"
         {
             chunked = true;
         }
 
         // Handle the Content-Length header
         if header.to_lowercase().trim() == "content-length" {
-            match str::parse::<usize>(value.trim()) {
+            match str::parse::<usize>(value[0].trim()) {
                 Ok(length) => content_length = Some(length),
                 Err(_) => return Err(Error::MalformedContentLength),
             }
