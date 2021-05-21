@@ -38,6 +38,13 @@
 //! feature variants were added, and is now an alias for
 //! `https-rustls`.
 //!
+//! ## `https-rustls-probe`
+//!
+//! Like `https-rustls`, but also includes the
+//! [`rustls-native-certs`](https://crates.io/crates/rustls-native-certs)
+//! crate to auto-detect root certificates installed in common
+//! locations.
+//!
 //! ## `https-native`
 //!
 //! Like `https`, but uses
