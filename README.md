@@ -6,8 +6,9 @@
 Simple, minimal-dependency HTTP client. Optional features for json
 responses (`json-using-serde`), unicode domains (`punycode`), http
 proxies (`proxy`), and https with various TLS implementations
-(`https-rustls`, `https-bundled`, `https-bundled-probe`,
-`https-native`, and `https` which is an alias for `https-rustls`).
+(`https-rustls`, `https-rustls-probe`, `https-bundled`, 
+`https-bundled-probe`,`https-native`, and `https` which is an alias
+for `https-rustls`).
 
 Without any optional features, my casual testing indicates about 100
 KB additional executable size for stripped release builds using this

@@ -20,6 +20,13 @@ use webpki_roots::TLS_SERVER_ROOTS;
 lazy_static::lazy_static! {
     static ref CONFIG: Arc<ClientConfig> = {
         let mut config = ClientConfig::new();
+
+        // Try to load native certs
+        #[cfg(feature = "https-rustls-probe")]
+        if let Ok(os_roots) = rustls_native_certs::load_native_certs() {
+            config.root_store = os_roots;
+        }
+
         config
             .root_store
             .add_server_trust_anchors(&TLS_SERVER_ROOTS);
