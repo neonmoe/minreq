@@ -8,7 +8,9 @@ script:
   - cargo test --release
   - cargo test --features "https json-using-serde punycode proxy"
   - cargo test --features "https json-using-serde punycode proxy" --release
-  - cargo test --features "https"
+  - cargo test --features "https-rustls"
+  - cargo test --features "https-rustls-probe"
+  - cargo test --features "https-bundled"
   - cargo test --features "https-bundled-probe"
   - cargo test --features "https-native"
   - cargo test --features "json-using-serde"
