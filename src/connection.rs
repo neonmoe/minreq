@@ -143,9 +143,6 @@ impl Connection {
             // Rustls setup
             log::trace!("Setting up TLS parameters for {}.", self.request.host);
             let dns_name = &self.request.host;
-            // parse_url in response.rs ensures that there is always a
-            // ":port" in the host, which is why this unwrap is safe.
-            let dns_name = dns_name.split(':').next().unwrap();
             let dns_name = match DNSNameRef::try_from_ascii_str(dns_name) {
                 Ok(result) => result,
                 Err(err) => return Err(Error::IoError(io::Error::new(io::ErrorKind::Other, err))),
@@ -183,9 +180,6 @@ impl Connection {
 
             log::trace!("Setting up TLS parameters for {}.", self.request.host);
             let dns_name = &self.request.host;
-            // parse_url in response.rs ensures that there is always a
-            // ":port" in the host, which is why this unwrap is safe.
-            let dns_name = dns_name.split(':').next().unwrap();
             /*
             let mut builder = TlsConnector::builder();
             ...
@@ -257,7 +251,8 @@ impl Connection {
     }
 
     fn connect(&self) -> Result<TcpStream, Error> {
-        let tcp_connect = |host: &str| -> Result<TcpStream, Error> {
+        let tcp_connect = |host: &str, port: u32| -> Result<TcpStream, Error> {
+            let host = format!("{}:{}", host, port);
             let mut addrs = host.to_socket_addrs().map_err(Error::IoError)?;
             let sock_address = addrs.next().ok_or(Error::AddressNotFound)?;
             let stream = if let Some(timeout) = self.timeout()? {
@@ -272,8 +267,7 @@ impl Connection {
         match self.request.proxy {
             Some(ref proxy) => {
                 // do proxy things
-                let proxy_host = format!("{}:{}", proxy.server, proxy.port);
-                let mut tcp = tcp_connect(&proxy_host)?;
+                let mut tcp = tcp_connect(&proxy.server, proxy.port)?;
 
                 write!(tcp, "{}", proxy.connect(self.request.host.as_str())).unwrap();
                 tcp.flush()?;
@@ -293,11 +287,11 @@ impl Connection {
 
                 Ok(tcp)
             }
-            None => tcp_connect(&self.request.host),
+            None => tcp_connect(&self.request.host, self.request.port),
         }
 
         #[cfg(not(feature = "proxy"))]
-        tcp_connect(&self.request.host)
+        tcp_connect(&self.request.host, self.request.port)
     }
 }
 

@@ -72,6 +72,7 @@ impl fmt::Display for Method {
 pub struct Request {
     pub(crate) method: Method,
     pub(crate) host: URL,
+    pub(crate) port: u32,
     resource: URL,
     headers: HashMap<String, String>,
     body: Option<Vec<u8>>,
@@ -91,10 +92,11 @@ impl Request {
     /// This is only the request's data, it is not sent yet. For
     /// sending the request, see [`send`](struct.Request.html#method.send).
     pub fn new<T: Into<URL>>(method: Method, url: T) -> Request {
-        let (https, host, resource) = parse_url(url.into());
+        let (https, host, port, resource) = parse_url(url.into());
         Request {
             method,
             host,
+            port,
             resource,
             headers: HashMap::new(),
             body: None,
@@ -357,10 +359,11 @@ impl Request {
         };
 
         if url.contains("://") {
-            let (mut https, mut host, resource) = parse_url(url);
+            let (mut https, mut host, mut port, resource) = parse_url(url);
             let mut resource = inherit_fragment(resource, &self.resource);
             std::mem::swap(&mut https, &mut self.https);
             std::mem::swap(&mut host, &mut self.host);
+            std::mem::swap(&mut port, &mut self.port);
             std::mem::swap(&mut resource, &mut self.resource);
             self.redirects.push((https, host, resource));
         } else {
@@ -393,15 +396,17 @@ impl Request {
     }
 }
 
-fn parse_url(url: URL) -> (bool, URL, URL) {
+fn parse_url(url: URL) -> (bool, URL, u32, URL) {
     enum UrlParseStatus {
         Protocol,
         AtFirstSlash,
         Host,
+        Port,
         Resource,
     }
 
     let mut host = URL::new();
+    let mut port = String::new();
     let mut resource = URL::new();
     let mut status = UrlParseStatus::Protocol;
     for c in url.chars() {
@@ -419,9 +424,17 @@ fn parse_url(url: URL) -> (bool, URL, URL) {
                         status = UrlParseStatus::Resource;
                         resource.push(c);
                     }
+                    ':' => status = UrlParseStatus::Port,
                     _ => host.push(c),
                 }
             }
+            UrlParseStatus::Port => match c {
+                '/' | '?' => {
+                    status = UrlParseStatus::Resource;
+                    resource.push(c);
+                }
+                _ => port.push(c),
+            },
             UrlParseStatus::Resource => resource.push(c),
             _ => {}
         }
@@ -432,10 +445,8 @@ fn parse_url(url: URL) -> (bool, URL, URL) {
     }
     // Set appropriate port
     let https = url.starts_with("https://");
-    if !host.contains(':') {
-        host += if https { ":443" } else { ":80" };
-    }
-    (https, host, resource)
+    let port = u32::from_str_radix(&port, 10).unwrap_or_else(|_| if https { 443 } else { 80 });
+    (https, host, port, resource)
 }
 
 /// Alias for [Request::new](struct.Request.html#method.new) with `method` set to
