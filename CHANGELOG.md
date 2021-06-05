@@ -5,6 +5,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed
+- The port is no longer included in the `Host` header when sending
+  requests, and port handling was cleaned up overall. This fixes
+  issues with infinite redirections and https handshakes for some
+  websites. Thanks to @Shnatsel for reporting the issues, and @joeried
+  for debugging and figuring out the root cause of these problems!
+  ([#48](https://github.com/neonmoe/minreq/issues/48),
+  [#49](https://github.com/neonmoe/minreq/issues/49))
 
 ## [2.4.0] - 2021-05-27
 ### Added
