@@ -287,11 +287,11 @@ impl Connection {
 
                 Ok(tcp)
             }
-            None => tcp_connect(&self.request.host, self.request.port),
+            None => tcp_connect(&self.request.host, self.request.port.port()),
         }
 
         #[cfg(not(feature = "proxy"))]
-        tcp_connect(&self.request.host, self.request.port)
+        tcp_connect(&self.request.host, self.request.port.port())
     }
 }
 

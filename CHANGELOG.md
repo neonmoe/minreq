@@ -5,6 +5,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed
+- A regression in 2.4.1 where the port is no longer included in the
+  `Host`, even if it's a non-standard port. Now the port is always
+  included if it's in the request URL, and omitted if the port is
+  implied. Thanks for the report, @ollpu!
+  ([#61](https://github.com/neonmoe/minreq/issues/61))
 
 ## [2.4.1] - 2021-06-05
 ### Fixed

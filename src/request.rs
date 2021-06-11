@@ -53,6 +53,23 @@ impl fmt::Display for Method {
     }
 }
 
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub(crate) enum Port {
+    ImplicitHttp,
+    ImplicitHttps,
+    Explicit(u32),
+}
+
+impl Port {
+    pub(crate) fn port(self) -> u32 {
+        match self {
+            Port::ImplicitHttp => 80,
+            Port::ImplicitHttps => 443,
+            Port::Explicit(port) => port,
+        }
+    }
+}
+
 /// An HTTP request.
 ///
 /// Generally created by the [`minreq::get`](fn.get.html)-style
@@ -72,7 +89,7 @@ impl fmt::Display for Method {
 pub struct Request {
     pub(crate) method: Method,
     pub(crate) host: URL,
-    pub(crate) port: u32,
+    pub(crate) port: Port,
     resource: URL,
     headers: HashMap<String, String>,
     body: Option<Vec<u8>>,
@@ -296,11 +313,17 @@ impl Request {
 
     fn get_http_head(&self) -> String {
         let mut http = String::with_capacity(32);
+
         // Add the request line and the "Host" header
         http += &format!(
-            "{} {} HTTP/1.1\r\nHost: {}\r\n",
+            "{} {} HTTP/1.1\r\nHost: {}",
             self.method, self.resource, self.host
         );
+        if let Port::Explicit(port) = self.port {
+            http += &format!(":{}", port);
+        }
+        http += "\r\n";
+
         // Add other headers
         for (k, v) in &self.headers {
             http += &format!("{}: {}\r\n", k, v);
@@ -396,7 +419,7 @@ impl Request {
     }
 }
 
-fn parse_url(url: URL) -> (bool, URL, u32, URL) {
+fn parse_url(url: URL) -> (bool, URL, Port, URL) {
     enum UrlParseStatus {
         Protocol,
         AtFirstSlash,
@@ -445,7 +468,15 @@ fn parse_url(url: URL) -> (bool, URL, u32, URL) {
     }
     // Set appropriate port
     let https = url.starts_with("https://");
-    let port = u32::from_str_radix(&port, 10).unwrap_or_else(|_| if https { 443 } else { 80 });
+    let port = u32::from_str_radix(&port, 10)
+        .map(|port| Port::Explicit(port))
+        .unwrap_or_else(|_| {
+            if https {
+                Port::ImplicitHttps
+            } else {
+                Port::ImplicitHttp
+            }
+        });
     (https, host, port, resource)
 }
 
