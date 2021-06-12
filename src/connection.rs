@@ -297,7 +297,7 @@ impl Connection {
 
 fn handle_redirects(connection: Connection, response: ResponseLazy) -> Result<ResponseLazy, Error> {
     let status_code = response.status_code;
-    let url = response.headers.get("location");
+    let url = response.get_header("location");
     if let Some(connection) = get_redirect(connection, status_code, url) {
         let connection = connection?;
         if connection.request.https {
