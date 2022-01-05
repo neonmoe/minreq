@@ -56,7 +56,3 @@ jobs:
         cargo test --features json-using-serde
         cargo test --features https
         cargo test --features "punycode proxy json-using-serde https"
-        cargo test --features "punycode proxy json-using-serde https-rustls-probe"
-        cargo test --features "punycode proxy json-using-serde https-bundled"
-        cargo test --features "punycode proxy json-using-serde https-bundled-probe"
-        cargo test --features "punycode proxy json-using-serde https-native"
