@@ -525,7 +525,7 @@ fn parse_status_line(line: &str) -> (i32, String) {
         return (status_code, reason_phrase);
     }
 
-    (503, "Invalid status line".to_string())
+    (503, "Server did not provide a status line".to_string())
 }
 
 fn parse_header(mut line: String) -> Option<(String, String)> {
