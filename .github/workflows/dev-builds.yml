@@ -1,0 +1,62 @@
+name: unit-tests
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test-linux:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Build
+      run: cargo build
+    - name: Test
+      run: |
+        cargo test
+        cargo test --features punycode
+        cargo test --features proxy
+        cargo test --features json-using-serde
+        cargo test --features https
+        cargo test --features "punycode proxy json-using-serde https"
+        cargo test --features "punycode proxy json-using-serde https-rustls-probe"
+        cargo test --features "punycode proxy json-using-serde https-bundled"
+        cargo test --features "punycode proxy json-using-serde https-bundled-probe"
+        cargo test --features "punycode proxy json-using-serde https-native"
+  test-windows:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Build
+      run: cargo build
+    - name: Test
+      run: |
+        cargo test
+        cargo test --features punycode
+        cargo test --features proxy
+        cargo test --features json-using-serde
+        cargo test --features https
+        cargo test --features "punycode proxy json-using-serde https"
+  test-macos:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Build
+      run: cargo build
+    - name: Test
+      run: |
+        cargo test
+        cargo test --features punycode
+        cargo test --features proxy
+        cargo test --features json-using-serde
+        cargo test --features https
+        cargo test --features "punycode proxy json-using-serde https"
+        cargo test --features "punycode proxy json-using-serde https-rustls-probe"
+        cargo test --features "punycode proxy json-using-serde https-bundled"
+        cargo test --features "punycode proxy json-using-serde https-bundled-probe"
+        cargo test --features "punycode proxy json-using-serde https-native"
