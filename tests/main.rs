@@ -249,3 +249,9 @@ fn test_status_line_cap() {
         .send();
     assert!(body.is_ok());
 }
+
+#[test]
+fn test_massive_content_length() {
+    setup();
+    panic!("{:#?}", minreq::get(url("/massive_content_length")).send());
+}
