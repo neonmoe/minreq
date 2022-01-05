@@ -1,6 +1,6 @@
 use crate::{connection::HttpStream, Error};
 use std::collections::HashMap;
-use std::io::{Bytes, Read};
+use std::io::{Bytes, ErrorKind, Read};
 use std::str;
 
 /// An HTTP response.
@@ -33,9 +33,17 @@ impl Response {
         let mut body = Vec::new();
         if !is_head && parent.status_code != 204 && parent.status_code != 304 {
             for byte in &mut parent {
-                let (byte, length) = byte?;
-                body.reserve(length);
-                body.push(byte);
+                match byte {
+                    Ok((byte, length)) => {
+                        body.reserve(length);
+                        body.push(byte);
+                    }
+                    Err(Error::IoError(err)) if err.kind() == ErrorKind::WouldBlock => {
+                        // Busy waiting isn't ideal, but waiting for N milliseconds would be worse.
+                        std::thread::yield_now();
+                    }
+                    Err(err) => return Err(err),
+                }
             }
         }
 
