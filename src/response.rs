@@ -491,19 +491,27 @@ fn read_line(
 ) -> Result<String, Error> {
     let mut bytes = Vec::with_capacity(32);
     for byte in stream {
-        let byte = byte?;
-        if let Some(max_len) = max_len {
-            if bytes.len() >= max_len {
-                return Err(overflow_error);
+        match byte {
+            Ok(byte) => {
+                if let Some(max_len) = max_len {
+                    if bytes.len() >= max_len {
+                        return Err(overflow_error);
+                    }
+                }
+                if byte == b'\n' {
+                    if let Some(b'\r') = bytes.last() {
+                        bytes.pop();
+                    }
+                    break;
+                } else {
+                    bytes.push(byte);
+                }
             }
-        }
-        if byte == b'\n' {
-            if let Some(b'\r') = bytes.last() {
-                bytes.pop();
+            Err(err) if err.kind() == ErrorKind::WouldBlock => {
+                // Busy waiting isn't ideal, but waiting for N milliseconds would be worse.
+                std::thread::yield_now();
             }
-            break;
-        } else {
-            bytes.push(byte);
+            Err(err) => return Err(Error::IoError(err)),
         }
     }
     String::from_utf8(bytes).map_err(|_error| Error::InvalidUtf8InResponse)
