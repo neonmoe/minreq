@@ -350,7 +350,7 @@ fn read_chunked(
         let incoming_length = if length_line.is_empty() {
             0
         } else {
-            let length = if let Some(i) = length_line.find(";") {
+            let length = if let Some(i) = length_line.find(';') {
                 length_line[..i].trim()
             } else {
                 length_line.trim()

@@ -1,7 +1,6 @@
 extern crate minreq;
 extern crate tiny_http;
 use self::tiny_http::{Header, Method, Response, Server, StatusCode};
-use std::io::Read;
 use std::str::FromStr;
 use std::sync::{Arc, Once};
 use std::thread;

@@ -149,7 +149,7 @@ impl Request {
         // Checks if the resource already has a query parameter
         // mentioned in url and if true, adds '&' to add one more
         // parameter or adds '?' to add the first parameter
-        if self.resource.contains("?") {
+        if self.resource.contains('?') {
             self.resource.push('&');
         } else {
             self.resource.push('?');
@@ -331,10 +331,11 @@ impl Request {
 
         if self.method == Method::Post || self.method == Method::Put || self.method == Method::Patch
         {
-            if let None = self.headers.keys().find(|key| {
+            let not_length = |key: &String| {
                 let key = key.to_lowercase();
-                key == "content-length" || key == "transfer-encoding"
-            }) {
+                key != "content-length" && key != "transfer-encoding"
+            };
+            if self.headers.keys().all(not_length) {
                 // A user agent SHOULD send a Content-Length in a request message when no Transfer-Encoding
                 // is sent and the request method defines a meaning for an enclosed payload body.
                 // refer: https://tools.ietf.org/html/rfc7230#section-3.3.2
@@ -468,15 +469,13 @@ fn parse_url(url: URL) -> (bool, URL, Port, URL) {
     }
     // Set appropriate port
     let https = url.starts_with("https://");
-    let port = u32::from_str_radix(&port, 10)
-        .map(|port| Port::Explicit(port))
-        .unwrap_or_else(|_| {
-            if https {
-                Port::ImplicitHttps
-            } else {
-                Port::ImplicitHttp
-            }
-        });
+    let port = port.parse::<u32>().map(Port::Explicit).unwrap_or_else(|_| {
+        if https {
+            Port::ImplicitHttps
+        } else {
+            Port::ImplicitHttp
+        }
+    });
     (https, host, port, resource)
 }
 
