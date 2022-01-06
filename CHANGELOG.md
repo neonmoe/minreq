@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.1] - 2022-01-07
+### Fixed
+- GitHub API requests without User-Agent returning an IoError. Thanks
+  for the report, @tech-ticks!
+  ([#66](https://github.com/neonmoe/minreq/issues/66))
+
 ## [2.5.0] - 2022-01-06
 ### Fixed
 - Returning the wrong status code when the response was missing a
