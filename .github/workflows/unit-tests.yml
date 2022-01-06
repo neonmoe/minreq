@@ -23,11 +23,16 @@ jobs:
         cargo test --features proxy
         cargo test --features json-using-serde
         cargo test --features https
-        cargo test --features "punycode proxy json-using-serde https"
+        cargo test --features "punycode proxy json-using-serde https-rustls"
         cargo test --features "punycode proxy json-using-serde https-rustls-probe"
         cargo test --features "punycode proxy json-using-serde https-bundled"
         cargo test --features "punycode proxy json-using-serde https-bundled-probe"
         cargo test --features "punycode proxy json-using-serde https-native"
+        cargo clippy --all-targets --features "punycode proxy json-using-serde https-rustls" -- --no-deps -D warnings
+        cargo clippy --all-targets --features "punycode proxy json-using-serde https-rustls-probe" -- --no-deps -D warnings
+        cargo clippy --all-targets --features "punycode proxy json-using-serde https-bundled" -- --no-deps -D warnings
+        cargo clippy --all-targets --features "punycode proxy json-using-serde https-bundled-probe" -- --no-deps -D warnings
+        cargo clippy --all-targets --features "punycode proxy json-using-serde https-native" -- --no-deps -D warnings
   test-windows:
     runs-on: windows-latest
     steps:

@@ -194,7 +194,7 @@ impl<S> From<imp::HandshakeError<S>> for HandshakeError<S> {
 
 /// SSL/TLS protocol versions.
 #[derive(Debug, Copy, Clone)]
-#[allow(dead_code)]
+#[allow(dead_code, clippy::manual_non_exhaustive)]
 pub enum Protocol {
     /// The SSL 3.0 protocol.
     ///

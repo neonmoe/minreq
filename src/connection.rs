@@ -28,7 +28,11 @@ lazy_static::lazy_static! {
         // Try to load native certs
         #[cfg(feature = "https-rustls-probe")]
         if let Ok(os_roots) = rustls_native_certs::load_native_certs() {
-            root_certificates = os_roots;
+            for root_cert in os_roots {
+                // Ignore erroneous OS certificates, there's nothing
+                // to do differently in that situation anyways.
+                let _ = root_certificates.add(&rustls::Certificate(root_cert.0));
+            }
         }
 
         let create_owned_trust_anchor = |ta: &TrustAnchor| {
@@ -171,7 +175,7 @@ impl Connection {
             let mut tls = StreamOwned::new(sess, tcp); // I don't think this actually does any communication.
             log::trace!("Writing HTTPS request to {}.", self.request.host);
             let _ = tls.get_ref().set_write_timeout(self.timeout()?);
-            tls.write(&bytes)?;
+            tls.write_all(&bytes)?;
 
             // Receive request
             log::trace!("Reading HTTPS response from {}.", self.request.host);
@@ -215,7 +219,7 @@ impl Connection {
             };
             log::trace!("Writing HTTPS request to {}.", self.request.host);
             let _ = tls.get_ref().set_write_timeout(self.timeout()?);
-            tls.write(&bytes)?;
+            tls.write_all(&bytes)?;
 
             // Receive request
             log::trace!("Reading HTTPS response from {}.", self.request.host);

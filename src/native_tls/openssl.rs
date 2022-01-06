@@ -1,6 +1,4 @@
 #[cfg(feature = "openssl-probe")]
-use openssl_probe;
-#[cfg(feature = "openssl-probe")]
 use std::sync::Once;
 
 use ::openssl::error::ErrorStack;
@@ -14,7 +12,7 @@ use ::openssl::ssl::{
     self, MidHandshakeSslStream, SslAcceptor, SslConnector, SslContextBuilder, SslMethod,
     SslVerifyMode,
 };
-use ::openssl::x509::{X509, store::X509StoreBuilder, X509VerifyResult};
+use ::openssl::x509::{store::X509StoreBuilder, X509VerifyResult, X509};
 use std::error;
 use std::fmt;
 use std::io;
@@ -319,8 +317,7 @@ impl TlsConnector {
 
 impl fmt::Debug for TlsConnector {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        fmt
-            .debug_struct("TlsConnector")
+        fmt.debug_struct("TlsConnector")
             // n.b. SslConnector is a newtype on SslContext which implements a noop Debug so it's omitted
             .field("use_sni", &self.use_sni)
             .field("accept_invalid_hostnames", &self.accept_invalid_hostnames)
