@@ -3,6 +3,8 @@ use std::collections::HashMap;
 use std::io::{Bytes, ErrorKind, Read};
 use std::str;
 
+const MAX_CONTENT_LENGTH: usize = 16 * 1024;
+
 /// An HTTP response.
 ///
 /// Returned by [`Request::send`](struct.Request.html#method.send).
@@ -189,7 +191,9 @@ impl Response {
 /// the future (including this byte). Note, however, that the `usize`
 /// can change, particularly when the `Transfer-Encoding` is
 /// `chunked`: then it will reflect how many bytes are left of the
-/// current chunk.
+/// current chunk. The expected size is capped at 16 KiB to avoid
+/// server-side DoS attacks targeted at clients accidentally reserving
+/// too much memory.
 ///
 /// # Example
 /// ```no_run
@@ -289,7 +293,8 @@ fn read_with_content_length(
 
         if let Some(byte) = bytes.next() {
             match byte {
-                Ok(byte) => return Some(Ok((byte, *content_length + 1))),
+                // Cap Content-Length to 16KiB, to avoid out-of-memory issues.
+                Ok(byte) => return Some(Ok((byte, (*content_length).min(MAX_CONTENT_LENGTH) + 1))),
                 Err(err) => return Some(Err(Error::IoError(err))),
             }
         }
@@ -388,7 +393,7 @@ fn read_chunked(
                         }
                     }
 
-                    return Some(Ok((byte, *chunk_length + 1)));
+                    return Some(Ok((byte, (*chunk_length).min(MAX_CONTENT_LENGTH) + 1)));
                 }
                 Err(err) => return Some(Err(Error::IoError(err))),
             }

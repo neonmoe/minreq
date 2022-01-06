@@ -1,6 +1,7 @@
 extern crate minreq;
 extern crate tiny_http;
 use self::tiny_http::{Header, Method, Response, Server, StatusCode};
+use std::io::Read;
 use std::str::FromStr;
 use std::sync::{Arc, Once};
 use std::thread;
@@ -67,7 +68,7 @@ pub fn setup() {
                     }
                     Method::Get if url == "/massive_content_length" => {
                         let status = StatusCode(200);
-                        let body = std::io::repeat(b'.');
+                        let body = std::io::empty();
                         let length = 1_000_000_000_000_000;
                         let response = Response::new(status, vec![], body, Some(length), None)
                             .with_chunked_threshold(2 * length);

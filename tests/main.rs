@@ -253,5 +253,10 @@ fn test_status_line_cap() {
 #[test]
 fn test_massive_content_length() {
     setup();
-    panic!("{:#?}", minreq::get(url("/massive_content_length")).send());
+    std::thread::spawn(|| {
+        // If minreq trusts Content-Length, this should crash pretty much straight away.
+        let _ = minreq::get(url("/massive_content_length")).send();
+    });
+    std::thread::sleep(std::time::Duration::from_millis(500));
+    // If it were to crash, it would have at this point. Pass!
 }
