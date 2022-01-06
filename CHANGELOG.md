@@ -5,6 +5,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed
+- Returning the wrong status code when the response was missing a
+  status phrase. Thanks for the PR, @richarddd!
+  ([#64](https://github.com/neonmoe/minreq/issues/64))
+- Non-lazy requests crashing if the request had a very big
+  Content-Length header. Thanks for the report, @Shnatsel!
+  ([#63](https://github.com/neonmoe/minreq/issues/63))
 
 ## [2.4.2] - 2021-06-11
 ### Fixed
