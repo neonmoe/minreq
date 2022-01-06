@@ -10,6 +10,9 @@ pub enum Error {
     /// conversion failed.
     InvalidUtf8InBody(str::Utf8Error),
 
+    #[cfg(feature = "rustls")]
+    /// Ran into a rustls error while creating the connection.
+    RustlsCreateConnection(rustls::Error),
     /// Ran into an IO problem while loading the response.
     IoError(io::Error),
     /// Couldn't parse the incoming chunk's length while receiving a
@@ -81,6 +84,8 @@ impl fmt::Display for Error {
             IoError(err) => write!(f, "{}", err),
             InvalidUtf8InBody(err) => write!(f, "{}", err),
 
+            #[cfg(feature = "rustls")]
+            RustlsCreateConnection(err) => write!(f, "error creating rustls connection: {}", err),
             MalformedChunkLength => write!(f, "non-usize chunk length with transfer-encoding: chunked"),
             MalformedChunkEnd => write!(f, "chunk did not end after reading the expected amount of bytes"),
             MalformedContentLength => write!(f, "non-usize content length"),
@@ -111,6 +116,8 @@ impl error::Error for Error {
             SerdeJsonError(err) => Some(err),
             IoError(err) => Some(err),
             InvalidUtf8InBody(err) => Some(err),
+            #[cfg(feature = "rustls")]
+            RustlsCreateConnection(err) => Some(err),
             _ => None,
         }
     }

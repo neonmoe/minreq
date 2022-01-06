@@ -4,7 +4,11 @@ use crate::{Error, Method, Request, ResponseLazy};
 #[cfg(feature = "native-tls")]
 use native_tls::{TlsConnector, TlsStream};
 #[cfg(feature = "rustls")]
-use rustls::{self, ClientConfig, ClientSession, StreamOwned};
+use rustls::{
+    self, ClientConfig, ClientConnection, OwnedTrustAnchor, RootCertStore, ServerName, StreamOwned,
+};
+#[cfg(feature = "rustls")]
+use std::convert::TryFrom;
 use std::env;
 use std::io::{self, BufReader, BufWriter, Read, Write};
 use std::net::{TcpStream, ToSocketAddrs};
@@ -12,31 +16,41 @@ use std::net::{TcpStream, ToSocketAddrs};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 #[cfg(feature = "webpki")]
-use webpki::DNSNameRef;
+use webpki::TrustAnchor;
 #[cfg(feature = "webpki")]
 use webpki_roots::TLS_SERVER_ROOTS;
 
 #[cfg(feature = "rustls")]
 lazy_static::lazy_static! {
     static ref CONFIG: Arc<ClientConfig> = {
-        let mut config = ClientConfig::new();
+        let mut root_certificates = RootCertStore::empty();
 
         // Try to load native certs
         #[cfg(feature = "https-rustls-probe")]
         if let Ok(os_roots) = rustls_native_certs::load_native_certs() {
-            config.root_store = os_roots;
+            root_certificates = os_roots;
         }
 
-        config
-            .root_store
-            .add_server_trust_anchors(&TLS_SERVER_ROOTS);
+        let create_owned_trust_anchor = |ta: &TrustAnchor| {
+            OwnedTrustAnchor::from_subject_spki_name_constraints(
+                ta.subject,
+                ta.spki,
+                ta.name_constraints,
+            )
+        };
+        root_certificates
+            .add_server_trust_anchors(TLS_SERVER_ROOTS.0.iter().map(create_owned_trust_anchor));
+        let config = ClientConfig::builder()
+            .with_safe_defaults()
+            .with_root_certificates(root_certificates)
+            .with_no_client_auth();
         Arc::new(config)
     };
 }
 
 type UnsecuredStream = BufReader<TcpStream>;
 #[cfg(feature = "rustls")]
-type SecuredStream = StreamOwned<ClientSession, TcpStream>;
+type SecuredStream = StreamOwned<ClientConnection, TcpStream>;
 #[cfg(any(feature = "openssl", feature = "native-tls"))]
 type SecuredStream = TlsStream<TcpStream>;
 
@@ -142,12 +156,12 @@ impl Connection {
 
             // Rustls setup
             log::trace!("Setting up TLS parameters for {}.", self.request.host);
-            let dns_name = &self.request.host;
-            let dns_name = match DNSNameRef::try_from_ascii_str(dns_name) {
+            let dns_name = match ServerName::try_from(&*self.request.host) {
                 Ok(result) => result,
                 Err(err) => return Err(Error::IoError(io::Error::new(io::ErrorKind::Other, err))),
             };
-            let sess = ClientSession::new(&CONFIG, dns_name);
+            let sess = ClientConnection::new(CONFIG.clone(), dns_name)
+                .map_err(Error::RustlsCreateConnection)?;
 
             log::trace!("Establishing TCP connection to {}.", self.request.host);
             let tcp = self.connect()?;
