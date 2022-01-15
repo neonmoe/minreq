@@ -108,6 +108,13 @@ impl Request {
     ///
     /// This is only the request's data, it is not sent yet. For
     /// sending the request, see [`send`](struct.Request.html#method.send).
+    ///
+    /// If `urlencoding` is not enabled, it is the responsibility of the
+    /// user to ensure there are no illegal characters in the URL.
+    ///
+    /// If `urlencoding` is enabled, the resource part of the URL will be
+    /// encoded. Any URL special characters (e.g. &, #, =) are not encoded
+    /// as they are assumed to be meaningful parameters etc.
     pub fn new<T: Into<URL>>(method: Method, url: T) -> Request {
         let (https, host, port, resource) = parse_url(url.into());
         Request {
@@ -145,6 +152,12 @@ impl Request {
 
     /// Adds given key and value as query parameter to request url
     /// (resource).
+    ///
+    /// If `urlencoding` is not enabled, it is the responsibility
+    /// of the user to ensure there are no illegal characters in the
+    /// key or value.
+    ///
+    /// If `urlencoding` is enabled, the key and value are both encoded.
     pub fn with_param<T: Into<String>, U: Into<String>>(mut self, key: T, value: U) -> Request {
         // Checks if the resource already has a query parameter
         // mentioned in url and if true, adds '&' to add one more
@@ -154,8 +167,13 @@ impl Request {
         } else {
             self.resource.push('?');
         }
-        self.resource
-            .push_str(&format!("{}={}", key.into(), value.into()));
+        let key = key.into();
+        #[cfg(feature = "urlencoding")]
+        let key = urlencoding::encode(&key);
+        let value = value.into();
+        #[cfg(feature = "urlencoding")]
+        let value = urlencoding::encode(&value);
+        self.resource.push_str(&format!("{}={}", key, value));
         self
     }
 
@@ -459,7 +477,46 @@ fn parse_url(url: URL) -> (bool, URL, Port, URL) {
                 }
                 _ => port.push(c),
             },
+            #[cfg(not(feature = "urlencoding"))]
             UrlParseStatus::Resource => resource.push(c),
+            #[cfg(feature = "urlencoding")]
+            UrlParseStatus::Resource => match c {
+                // All URL-'safe' characters, plus URL 'special
+                // characters' like &, #, =, / ,?
+                '0'..='9'
+                | 'A'..='Z'
+                | 'a'..='z'
+                | '-'
+                | '.'
+                | '_'
+                | '~'
+                | '&'
+                | '#'
+                | '='
+                | '/'
+                | '?' => {
+                    resource.push(c);
+                }
+                // There is probably a simpler way to do this, but this
+                // method avoids any heap allocations (except extending
+                // `resource`)
+                _ => {
+                    // Any UTF-8 character can fit in 4 bytes
+                    let mut utf8_buf = [0u8; 4];
+                    // Bytes fill buffer from the front
+                    c.encode_utf8(&mut utf8_buf);
+                    // Slice disregards the unused portion of the buffer
+                    utf8_buf[..c.len_utf8()].iter().for_each(|byte| {
+                        // Convert byte to URL escape, e.g. %21 for b'!'
+                        let rem = *byte % 16;
+                        let right_char = to_hex_digit(rem);
+                        let left_char = to_hex_digit((*byte - rem) >> 4);
+                        resource.push('%');
+                        resource.push(left_char);
+                        resource.push(right_char);
+                    });
+                }
+            },
             _ => {}
         }
     }
@@ -477,6 +534,16 @@ fn parse_url(url: URL) -> (bool, URL, Port, URL) {
         }
     });
     (https, host, port, resource)
+}
+
+// https://github.com/kornelski/rust_urlencoding/blob/a4df8027ab34a86a63f1be727965cf101556403f/src/enc.rs#L130-L136
+// Converts a UTF-8 byte to a single hexadecimal character
+#[cfg(feature = "urlencoding")]
+fn to_hex_digit(digit: u8) -> char {
+    match digit {
+        0..=9 => (b'0' + digit) as char,
+        10..=255 => (b'A' - 10 + digit) as char,
+    }
 }
 
 /// Alias for [Request::new](struct.Request.html#method.new) with `method` set to

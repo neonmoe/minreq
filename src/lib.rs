@@ -94,6 +94,12 @@
 //!
 //! This feature enables proxy support.
 //!
+//! ## `urlencoding`
+//!
+//! This feature enable resource encoding for the URL resource when
+//! creating a request and any subsequently added parameters from
+//! [`Request::with_param`].
+//!
 //! # Examples
 //!
 //! ## Get
