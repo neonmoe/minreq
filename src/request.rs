@@ -599,3 +599,28 @@ pub fn trace<T: Into<URL>>(url: T) -> Request {
 pub fn patch<T: Into<URL>>(url: T) -> Request {
     Request::new(Method::Patch, url)
 }
+
+#[cfg(all(test, feature = "urlencoding"))]
+mod encoding_tests {
+    use super::get;
+
+    #[test]
+    fn test_with_param() {
+        let req = get("http://www.example.org")
+            .with_param("foo", "bar");
+        assert_eq!(&req.resource, "/?foo=bar");
+
+        let req = get("http://www.example.org")
+            .with_param("ówò", "what's this? 👀");
+        assert_eq!(&req.resource, "/?%C3%B3w%C3%B2=what%27s%20this%3F%20%F0%9F%91%80");
+    }
+
+    #[test]
+    fn test_on_creation() {
+        let req = get("http://www.example.org/?foo=bar#baz");
+        assert_eq!(&req.resource, "/?foo=bar#baz");
+
+        let req = get("http://www.example.org/?ówò=what's this? 👀");
+        assert_eq!(&req.resource, "/?%C3%B3w%C3%B2=what%27s%20this?%20%F0%9F%91%80");
+    }
+}
