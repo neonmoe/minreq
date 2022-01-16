@@ -151,20 +151,18 @@ impl Request {
     /// key or value.
     ///
     /// If `urlencoding` is enabled, the key and value are both encoded.
-    pub fn with_param<T: Into<String>, U: Into<String>>(mut self, key: T, value: U) -> Request {
-        let key = key.into();
+    pub fn with_param<T: AsRef<str>, U: AsRef<str>>(mut self, key: T, value: U) -> Request {
         #[cfg(feature = "urlencoding")]
-        let key = urlencoding::encode(&key);
-        let value = value.into();
+        let key = urlencoding::encode(key.as_ref());
         #[cfg(feature = "urlencoding")]
-        let value = urlencoding::encode(&value);
+        let value = urlencoding::encode(value.as_ref());
 
         if !self.params.is_empty() {
             self.params.push('&');
         }
-        self.params.push_str(&key);
+        self.params.push_str(key.as_ref());
         self.params.push('=');
-        self.params.push_str(&value);
+        self.params.push_str(value.as_ref());
         self
     }
 
