@@ -447,29 +447,25 @@ impl ParsedRequest {
 
 fn parse_url(url: &URL) -> Result<(bool, URL, Port, URL), Error> {
     enum UrlParseStatus {
-        Protocol,
-        AtFirstSlash,
         Host,
         Port,
         Resource,
     }
 
-    if !url.starts_with("http://") && !url.starts_with("https://") {
+    let (url, https) = if let Some(after_protocol) = url.strip_prefix("http://") {
+        (after_protocol, false)
+    } else if let Some(after_protocol) = url.strip_prefix("https://") {
+        (after_protocol, true)
+    } else {
         return Err(Error::InvalidProtocol);
-    }
+    };
 
     let mut host = URL::new();
     let mut port = String::new();
     let mut resource = URL::new();
-    let mut status = UrlParseStatus::Protocol;
+    let mut status = UrlParseStatus::Host;
     for c in url.chars() {
         match status {
-            UrlParseStatus::Protocol if c == '/' => {
-                status = UrlParseStatus::AtFirstSlash;
-            }
-            UrlParseStatus::AtFirstSlash if c == '/' => {
-                status = UrlParseStatus::Host;
-            }
             UrlParseStatus::Host => {
                 match c {
                     '/' | '?' => {
@@ -528,7 +524,6 @@ fn parse_url(url: &URL) -> Result<(bool, URL, Port, URL), Error> {
                     });
                 }
             },
-            _ => {}
         }
     }
     // Ensure the resource is *something*
@@ -536,7 +531,6 @@ fn parse_url(url: &URL) -> Result<(bool, URL, Port, URL), Error> {
         resource += "/";
     }
     // Set appropriate port
-    let https = url.starts_with("https://");
     let port = port.parse::<u32>().map(Port::Explicit).unwrap_or_else(|_| {
         if https {
             Port::ImplicitHttps
