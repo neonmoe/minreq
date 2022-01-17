@@ -1,6 +1,7 @@
 #[cfg(feature = "openssl")]
 use crate::native_tls::{TlsConnector, TlsStream};
-use crate::{Error, Method, Request, ResponseLazy};
+use crate::request::ParsedRequest;
+use crate::{Error, Method, ResponseLazy};
 #[cfg(feature = "native-tls")]
 use native_tls::{TlsConnector, TlsStream};
 #[cfg(feature = "rustls")]
@@ -118,16 +119,16 @@ impl Read for HttpStream {
 /// A connection to the server for sending
 /// [`Request`](struct.Request.html)s.
 pub struct Connection {
-    request: Request,
+    request: ParsedRequest,
     timeout_at: Option<Instant>,
 }
 
 impl Connection {
-    /// Creates a new `Connection`. See
-    /// [`Request`](struct.Request.html) for specifics about *what* is
-    /// being sent.
-    pub(crate) fn new(request: Request) -> Connection {
+    /// Creates a new `Connection`. See [Request] and [ParsedRequest]
+    /// for specifics about *what* is being sent.
+    pub(crate) fn new(request: ParsedRequest) -> Connection {
         let timeout = request
+            .config
             .timeout
             .or_else(|| match env::var("MINREQ_TIMEOUT") {
                 Ok(t) => t.parse::<u64>().ok(),
@@ -181,8 +182,8 @@ impl Connection {
             log::trace!("Reading HTTPS response from {}.", self.request.host);
             let response = ResponseLazy::from_stream(
                 HttpStream::create_secured(tls, self.timeout_at),
-                self.request.max_headers_size,
-                self.request.max_status_line_len,
+                self.request.config.max_headers_size,
+                self.request.config.max_status_line_len,
             )?;
             handle_redirects(self, response)
         })
@@ -225,8 +226,8 @@ impl Connection {
             log::trace!("Reading HTTPS response from {}.", self.request.host);
             let response = ResponseLazy::from_stream(
                 HttpStream::create_secured(tls, self.timeout_at),
-                self.request.max_headers_size,
-                self.request.max_status_line_len,
+                self.request.config.max_headers_size,
+                self.request.config.max_status_line_len,
             )?;
             handle_redirects(self, response)
         })
@@ -261,8 +262,8 @@ impl Connection {
             let stream = HttpStream::create_unsecured(BufReader::new(tcp), self.timeout_at);
             let response = ResponseLazy::from_stream(
                 stream,
-                self.request.max_headers_size,
-                self.request.max_status_line_len,
+                self.request.config.max_headers_size,
+                self.request.config.max_status_line_len,
             )?;
             handle_redirects(self, response)
         })
@@ -282,7 +283,7 @@ impl Connection {
         };
 
         #[cfg(feature = "proxy")]
-        match self.request.proxy {
+        match self.request.config.proxy {
             Some(ref proxy) => {
                 // do proxy things
                 let mut tcp = tcp_connect(&proxy.server, proxy.port)?;
@@ -347,9 +348,9 @@ fn get_redirect(
             match connection.request.redirect_to(url.clone()) {
                 Ok(()) => {
                     if status_code == 303 {
-                        match connection.request.method {
+                        match connection.request.config.method {
                             Method::Post | Method::Put | Method::Delete => {
-                                connection.request.method = Method::Get;
+                                connection.request.config.method = Method::Get;
                             }
                             _ => {}
                         }

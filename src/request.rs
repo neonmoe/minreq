@@ -88,17 +88,14 @@ impl Port {
 #[derive(Clone, PartialEq, Debug)]
 pub struct Request {
     pub(crate) method: Method,
-    pub(crate) host: URL,
-    pub(crate) port: Port,
-    resource: URL,
+    url: URL,
+    params: String,
     headers: HashMap<String, String>,
     body: Option<Vec<u8>>,
     pub(crate) timeout: Option<u64>,
     pub(crate) max_headers_size: Option<usize>,
     pub(crate) max_status_line_len: Option<usize>,
     max_redirects: usize,
-    pub(crate) https: bool,
-    pub(crate) redirects: Vec<(bool, URL, URL)>,
     #[cfg(feature = "proxy")]
     pub(crate) proxy: Option<Proxy>,
 }
@@ -116,20 +113,16 @@ impl Request {
     /// encoded. Any URL special characters (e.g. &, #, =) are not encoded
     /// as they are assumed to be meaningful parameters etc.
     pub fn new<T: Into<URL>>(method: Method, url: T) -> Request {
-        let (https, host, port, resource) = parse_url(url.into());
         Request {
             method,
-            host,
-            port,
-            resource,
+            url: url.into(),
+            params: String::new(),
             headers: HashMap::new(),
             body: None,
             timeout: None,
             max_headers_size: None,
             max_status_line_len: None,
             max_redirects: 100,
-            https,
-            redirects: Vec::new(),
             #[cfg(feature = "proxy")]
             proxy: None,
         }
@@ -162,18 +155,19 @@ impl Request {
         // Checks if the resource already has a query parameter
         // mentioned in url and if true, adds '&' to add one more
         // parameter or adds '?' to add the first parameter
-        if self.resource.contains('?') {
-            self.resource.push('&');
-        } else {
-            self.resource.push('?');
-        }
         let key = key.into();
         #[cfg(feature = "urlencoding")]
         let key = urlencoding::encode(&key);
         let value = value.into();
         #[cfg(feature = "urlencoding")]
         let value = urlencoding::encode(&value);
-        self.resource.push_str(&format!("{}={}", key, value));
+
+        if !self.params.is_empty() {
+            self.params.push('&');
+        }
+        self.params.push_str(&key);
+        self.params.push('=');
+        self.params.push_str(&value);
         self
     }
 
@@ -257,41 +251,11 @@ impl Request {
         self
     }
 
-    /// Sends this request to the host.
-    ///
-    /// # Errors
-    ///
-    /// Returns `Err` if we run into an error while sending the
-    /// request, or receiving/parsing the response. The specific error
-    /// is described in the `Err`, and it can be any
-    /// [`minreq::Error`](enum.Error.html) except
-    /// [`SerdeJsonError`](enum.Error.html#variant.SerdeJsonError) and
-    /// [`InvalidUtf8InBody`](enum.Error.html#variant.InvalidUtf8InBody).
-    #[cfg(any(feature = "rustls", feature = "openssl", feature = "native-tls"))]
-    pub fn send(self) -> Result<Response, Error> {
-        if self.https {
-            let is_head = self.method == Method::Head;
-            let response = Connection::new(self).send_https()?;
-            Response::create(response, is_head)
-        } else {
-            let is_head = self.method == Method::Head;
-            let response = Connection::new(self).send()?;
-            Response::create(response, is_head)
-        }
-    }
-
-    /// Sends this request to the host, loaded lazily.
-    ///
-    /// # Errors
-    ///
-    /// See [`send`](struct.Request.html#method.send).
-    #[cfg(any(feature = "rustls", feature = "openssl", feature = "native-tls"))]
-    pub fn send_lazy(self) -> Result<ResponseLazy, Error> {
-        if self.https {
-            Connection::new(self).send_https()
-        } else {
-            Connection::new(self).send()
-        }
+    /// Sets the proxy to use.
+    #[cfg(feature = "proxy")]
+    pub fn with_proxy(mut self, proxy: Proxy) -> Request {
+        self.proxy = Some(proxy);
+        self
     }
 
     /// Sends this request to the host.
@@ -304,13 +268,22 @@ impl Request {
     /// [`minreq::Error`](enum.Error.html) except
     /// [`SerdeJsonError`](enum.Error.html#variant.SerdeJsonError) and
     /// [`InvalidUtf8InBody`](enum.Error.html#variant.InvalidUtf8InBody).
-    #[cfg(not(any(feature = "rustls", feature = "openssl", feature = "native-tls")))]
     pub fn send(self) -> Result<Response, Error> {
-        if self.https {
-            Err(Error::HttpsFeatureNotEnabled)
+        let parsed_request = ParsedRequest::new(self)?;
+        if parsed_request.https {
+            #[cfg(any(feature = "rustls", feature = "openssl", feature = "native-tls"))]
+            {
+                let is_head = parsed_request.config.method == Method::Head;
+                let response = Connection::new(parsed_request).send_https()?;
+                Response::create(response, is_head)
+            }
+            #[cfg(not(any(feature = "rustls", feature = "openssl", feature = "native-tls")))]
+            {
+                Err(Error::HttpsFeatureNotEnabled)
+            }
         } else {
-            let is_head = self.method == Method::Head;
-            let response = Connection::new(self).send()?;
+            let is_head = parsed_request.config.method == Method::Head;
+            let response = Connection::new(parsed_request).send()?;
             Response::create(response, is_head)
         }
     }
@@ -320,13 +293,51 @@ impl Request {
     /// # Errors
     ///
     /// See [`send`](struct.Request.html#method.send).
-    #[cfg(not(any(feature = "rustls", feature = "openssl", feature = "native-tls")))]
     pub fn send_lazy(self) -> Result<ResponseLazy, Error> {
-        if self.https {
-            Err(Error::HttpsFeatureNotEnabled)
+        let parsed_request = ParsedRequest::new(self)?;
+        if parsed_request.https {
+            #[cfg(any(feature = "rustls", feature = "openssl", feature = "native-tls"))]
+            {
+                Connection::new(parsed_request).send_https()
+            }
+            #[cfg(not(any(feature = "rustls", feature = "openssl", feature = "native-tls")))]
+            {
+                Err(Error::HttpsFeatureNotEnabled)
+            }
         } else {
-            Connection::new(self).send()
+            Connection::new(parsed_request).send()
         }
+    }
+}
+
+pub(crate) struct ParsedRequest {
+    pub(crate) host: URL,
+    pub(crate) port: Port,
+    resource: URL,
+    pub(crate) https: bool,
+    pub(crate) redirects: Vec<(bool, URL, URL)>,
+    pub(crate) config: Request,
+}
+
+impl ParsedRequest {
+    fn new(config: Request) -> Result<ParsedRequest, Error> {
+        let (https, host, port, mut resource) = parse_url(&config.url)?;
+        if !config.params.is_empty() {
+            if resource.contains('?') {
+                resource.push('&');
+            } else {
+                resource.push('?');
+            }
+            resource.push_str(&config.params);
+        }
+        Ok(ParsedRequest {
+            host,
+            port,
+            resource,
+            https,
+            redirects: Vec::new(),
+            config,
+        })
     }
 
     fn get_http_head(&self) -> String {
@@ -335,7 +346,7 @@ impl Request {
         // Add the request line and the "Host" header
         http += &format!(
             "{} {} HTTP/1.1\r\nHost: {}",
-            self.method, self.resource, self.host
+            self.config.method, self.resource, self.host
         );
         if let Port::Explicit(port) = self.port {
             http += &format!(":{}", port);
@@ -343,17 +354,19 @@ impl Request {
         http += "\r\n";
 
         // Add other headers
-        for (k, v) in &self.headers {
+        for (k, v) in &self.config.headers {
             http += &format!("{}: {}\r\n", k, v);
         }
 
-        if self.method == Method::Post || self.method == Method::Put || self.method == Method::Patch
+        if self.config.method == Method::Post
+            || self.config.method == Method::Put
+            || self.config.method == Method::Patch
         {
             let not_length = |key: &String| {
                 let key = key.to_lowercase();
                 key != "content-length" && key != "transfer-encoding"
             };
-            if self.headers.keys().all(not_length) {
+            if self.config.headers.keys().all(not_length) {
                 // A user agent SHOULD send a Content-Length in a request message when no Transfer-Encoding
                 // is sent and the request method defines a meaning for an enclosed payload body.
                 // refer: https://tools.ietf.org/html/rfc7230#section-3.3.2
@@ -374,7 +387,7 @@ impl Request {
     /// the server.
     pub(crate) fn as_bytes(&self) -> Vec<u8> {
         let mut head = self.get_http_head().into_bytes();
-        if let Some(body) = &self.body {
+        if let Some(body) = &self.config.body {
             head.extend(body);
         }
         head
@@ -401,7 +414,8 @@ impl Request {
         };
 
         if url.contains("://") {
-            let (mut https, mut host, mut port, resource) = parse_url(url);
+            let (mut https, mut host, mut port, resource) =
+                parse_url(&url).map_err(|_| Error::InvalidProtocolInRedirect)?;
             let mut resource = inherit_fragment(resource, &self.resource);
             std::mem::swap(&mut https, &mut self.https);
             std::mem::swap(&mut host, &mut self.host);
@@ -421,7 +435,7 @@ impl Request {
             resource_ == &self.resource && host_ == &self.host && https_ == &self.https
         };
 
-        if self.redirects.len() > self.max_redirects {
+        if self.redirects.len() > self.config.max_redirects {
             Err(Error::TooManyRedirections)
         } else if self.redirects.iter().any(is_this_url) {
             Err(Error::InfiniteRedirectionLoop)
@@ -429,22 +443,19 @@ impl Request {
             Ok(())
         }
     }
-
-    /// Sets the proxy to use.
-    #[cfg(feature = "proxy")]
-    pub fn with_proxy(mut self, proxy: Proxy) -> Request {
-        self.proxy = Some(proxy);
-        self
-    }
 }
 
-fn parse_url(url: URL) -> (bool, URL, Port, URL) {
+fn parse_url(url: &URL) -> Result<(bool, URL, Port, URL), Error> {
     enum UrlParseStatus {
         Protocol,
         AtFirstSlash,
         Host,
         Port,
         Resource,
+    }
+
+    if !url.starts_with("http://") && !url.starts_with("https://") {
+        return Err(Error::InvalidProtocol);
     }
 
     let mut host = URL::new();
@@ -533,7 +544,7 @@ fn parse_url(url: URL) -> (bool, URL, Port, URL) {
             Port::ImplicitHttp
         }
     });
-    (https, host, port, resource)
+    Ok((https, host, port, resource))
 }
 
 // https://github.com/kornelski/rust_urlencoding/blob/a4df8027ab34a86a63f1be727965cf101556403f/src/enc.rs#L130-L136
@@ -600,16 +611,49 @@ pub fn patch<T: Into<URL>>(url: T) -> Request {
     Request::new(Method::Patch, url)
 }
 
+#[cfg(test)]
+mod parsing_tests {
+    use super::{get, ParsedRequest};
+
+    #[test]
+    fn test_multiple_params() {
+        let req = get("http://www.example.org/test/res")
+            .with_param("foo", "bar")
+            .with_param("asd", "qwe");
+        let req = ParsedRequest::new(req).unwrap();
+        assert_eq!(&req.resource, "/test/res?foo=bar&asd=qwe");
+    }
+
+    #[test]
+    fn test_domain() {
+        let req = get("http://www.example.org/test/res").with_param("foo", "bar");
+        let req = ParsedRequest::new(req).unwrap();
+        assert_eq!(&req.host, "www.example.org");
+    }
+
+    #[test]
+    fn test_protocol() {
+        let req =
+            ParsedRequest::new(get("http://www.example.org/").with_param("foo", "bar")).unwrap();
+        assert!(!req.https);
+        let req =
+            ParsedRequest::new(get("https://www.example.org/").with_param("foo", "bar")).unwrap();
+        assert!(req.https);
+    }
+}
+
 #[cfg(all(test, feature = "urlencoding"))]
 mod encoding_tests {
-    use super::get;
+    use super::{get, ParsedRequest};
 
     #[test]
     fn test_with_param() {
         let req = get("http://www.example.org").with_param("foo", "bar");
+        let req = ParsedRequest::new(req).unwrap();
         assert_eq!(&req.resource, "/?foo=bar");
 
         let req = get("http://www.example.org").with_param("ówò", "what's this? 👀");
+        let req = ParsedRequest::new(req).unwrap();
         assert_eq!(
             &req.resource,
             "/?%C3%B3w%C3%B2=what%27s%20this%3F%20%F0%9F%91%80"
@@ -618,10 +662,10 @@ mod encoding_tests {
 
     #[test]
     fn test_on_creation() {
-        let req = get("http://www.example.org/?foo=bar#baz");
+        let req = ParsedRequest::new(get("http://www.example.org/?foo=bar#baz")).unwrap();
         assert_eq!(&req.resource, "/?foo=bar#baz");
 
-        let req = get("http://www.example.org/?ówò=what's this? 👀");
+        let req = ParsedRequest::new(get("http://www.example.org/?ówò=what's this? 👀")).unwrap();
         assert_eq!(
             &req.resource,
             "/?%C3%B3w%C3%B2=what%27s%20this?%20%F0%9F%91%80"

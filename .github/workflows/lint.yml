@@ -16,6 +16,8 @@ jobs:
     - uses: actions/checkout@v2
     - name: Run rustfmt
       run: rustfmt --check src/lib.rs
+    - name: Run cargo doc
+      run: cargo doc --features "punycode proxy json-using-serde https"
     - name: Run clippy
       run: |
         cargo clippy --all-targets --features "punycode proxy json-using-serde https-rustls" -- --no-deps -D warnings
