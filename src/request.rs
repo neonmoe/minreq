@@ -152,9 +152,6 @@ impl Request {
     ///
     /// If `urlencoding` is enabled, the key and value are both encoded.
     pub fn with_param<T: Into<String>, U: Into<String>>(mut self, key: T, value: U) -> Request {
-        // Checks if the resource already has a query parameter
-        // mentioned in url and if true, adds '&' to add one more
-        // parameter or adds '?' to add the first parameter
         let key = key.into();
         #[cfg(feature = "urlencoding")]
         let key = urlencoding::encode(&key);
@@ -445,7 +442,7 @@ impl ParsedRequest {
     }
 }
 
-fn parse_url(url: &URL) -> Result<(bool, URL, Port, URL), Error> {
+fn parse_url(url: &str) -> Result<(bool, URL, Port, URL), Error> {
     enum UrlParseStatus {
         Host,
         Port,
