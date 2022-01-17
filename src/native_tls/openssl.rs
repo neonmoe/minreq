@@ -1,18 +1,18 @@
 #[cfg(feature = "openssl-probe")]
 use std::sync::Once;
 
-use ::openssl::error::ErrorStack;
+use openssl::error::ErrorStack;
 /*
 use ::openssl::hash::MessageDigest;
 use ::openssl::nid::Nid;
 use ::openssl::pkcs12::Pkcs12;
 */
-use ::openssl::pkey::PKey;
-use ::openssl::ssl::{
+use openssl::pkey::PKey;
+use openssl::ssl::{
     self, MidHandshakeSslStream, SslAcceptor, SslConnector, SslContextBuilder, SslMethod,
     SslVerifyMode,
 };
-use ::openssl::x509::{store::X509StoreBuilder, X509VerifyResult, X509};
+use openssl::x509::{store::X509StoreBuilder, X509VerifyResult, X509};
 use std::error;
 use std::fmt;
 use std::io;
@@ -21,7 +21,7 @@ use super::{Protocol, TlsConnectorBuilder};
 /*
 use super::{Protocol, TlsAcceptorBuilder, TlsConnectorBuilder};
 */
-use ::openssl::pkey::Private;
+use openssl::pkey::Private;
 
 #[cfg(have_min_max_version)]
 fn supported_protocols(
@@ -29,7 +29,7 @@ fn supported_protocols(
     max: Option<Protocol>,
     ctx: &mut SslContextBuilder,
 ) -> Result<(), ErrorStack> {
-    use ::openssl::ssl::SslVersion;
+    use openssl::ssl::SslVersion;
 
     fn cvt(p: Protocol) -> SslVersion {
         match p {
@@ -53,7 +53,7 @@ fn supported_protocols(
     max: Option<Protocol>,
     ctx: &mut SslContextBuilder,
 ) -> Result<(), ErrorStack> {
-    use ::openssl::ssl::SslOptions;
+    use openssl::ssl::SslOptions;
 
     let no_ssl_mask = SslOptions::NO_SSLV2
         | SslOptions::NO_SSLV3

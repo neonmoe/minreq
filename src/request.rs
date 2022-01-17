@@ -606,13 +606,14 @@ mod encoding_tests {
 
     #[test]
     fn test_with_param() {
-        let req = get("http://www.example.org")
-            .with_param("foo", "bar");
+        let req = get("http://www.example.org").with_param("foo", "bar");
         assert_eq!(&req.resource, "/?foo=bar");
 
-        let req = get("http://www.example.org")
-            .with_param("ówò", "what's this? 👀");
-        assert_eq!(&req.resource, "/?%C3%B3w%C3%B2=what%27s%20this%3F%20%F0%9F%91%80");
+        let req = get("http://www.example.org").with_param("ówò", "what's this? 👀");
+        assert_eq!(
+            &req.resource,
+            "/?%C3%B3w%C3%B2=what%27s%20this%3F%20%F0%9F%91%80"
+        );
     }
 
     #[test]
@@ -621,6 +622,9 @@ mod encoding_tests {
         assert_eq!(&req.resource, "/?foo=bar#baz");
 
         let req = get("http://www.example.org/?ówò=what's this? 👀");
-        assert_eq!(&req.resource, "/?%C3%B3w%C3%B2=what%27s%20this?%20%F0%9F%91%80");
+        assert_eq!(
+            &req.resource,
+            "/?%C3%B3w%C3%B2=what%27s%20this?%20%F0%9F%91%80"
+        );
     }
 }

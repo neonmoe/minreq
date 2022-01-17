@@ -96,7 +96,7 @@
 //!
 //! ## `urlencoding`
 //!
-//! This feature enable resource encoding for the URL resource when
+//! This feature enables percent-encoding for the URL resource when
 //! creating a request and any subsequently added parameters from
 //! [`Request::with_param`].
 //!

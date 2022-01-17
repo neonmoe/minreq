@@ -1,0 +1,25 @@
+name: lint
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Run rustfmt
+      run: rustfmt --check src/lib.rs
+    - name: Run clippy
+      run: |
+        cargo clippy --all-targets --features "punycode proxy json-using-serde https-rustls" -- --no-deps -D warnings
+        cargo clippy --all-targets --features "punycode proxy json-using-serde https-rustls-probe" -- --no-deps -D warnings
+        cargo clippy --all-targets --features "punycode proxy json-using-serde https-bundled" -- --no-deps -D warnings
+        cargo clippy --all-targets --features "punycode proxy json-using-serde https-bundled-probe" -- --no-deps -D warnings
+        cargo clippy --all-targets --features "punycode proxy json-using-serde https-native" -- --no-deps -D warnings
