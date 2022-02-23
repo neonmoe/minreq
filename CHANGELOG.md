@@ -5,6 +5,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
+- The error returned when the request url does not start with
+  `https://` or `http://` now is now a slightly different IoError,
+  with a clearer message. This will be changed to a proper
+  minreq-specific error in 3.0, but for now it's an IoError to avoid
+  breaking the Error type.
+
+### Added
+- The `urlencoding` feature for automatically percent-encoding
+  urls. Thanks for the idea and PR, @alpha-tango-kilo!
+  ([#67](https://github.com/neonmoe/minreq/issues/67),
+  [#68](https://github.com/neonmoe/minreq/pull/68))
 
 ## [2.5.1] - 2022-01-07
 ### Fixed

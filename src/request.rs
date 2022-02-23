@@ -411,8 +411,14 @@ impl ParsedRequest {
         };
 
         if url.contains("://") {
-            let (mut https, mut host, mut port, resource) =
-                parse_url(&url).map_err(|_| Error::InvalidProtocolInRedirect)?;
+            let (mut https, mut host, mut port, resource) = parse_url(&url).map_err(|_| {
+                // TODO: Uncomment this for 3.0
+                // Error::InvalidProtocolInRedirect
+                Error::IoError(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    "was redirected to an absolute url with an invalid protocol",
+                ))
+            })?;
             let mut resource = inherit_fragment(resource, &self.resource);
             std::mem::swap(&mut https, &mut self.https);
             std::mem::swap(&mut host, &mut self.host);
@@ -454,7 +460,12 @@ fn parse_url(url: &str) -> Result<(bool, URL, Port, URL), Error> {
     } else if let Some(after_protocol) = url.strip_prefix("https://") {
         (after_protocol, true)
     } else {
-        return Err(Error::InvalidProtocol);
+        // TODO: Uncomment this for 3.0
+        // return Err(Error::InvalidProtocol);
+        return Err(Error::IoError(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            "was redirected to an absolute url with an invalid protocol",
+        )));
     };
 
     let mut host = URL::new();

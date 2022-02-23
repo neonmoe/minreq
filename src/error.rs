@@ -2,6 +2,7 @@ use std::{error, fmt, io, str};
 
 /// Represents an error while sending, receiving, or parsing an HTTP response.
 #[derive(Debug)]
+// TODO: Make non-exhaustive for 3.0?
 pub enum Error {
     #[cfg(feature = "json-using-serde")]
     /// Ran into a Serde error.
@@ -66,12 +67,12 @@ pub enum Error {
     ProxyConnect,
     /// The provided credentials were rejected by the proxy server.
     InvalidProxyCreds,
-    /// The URL does not start with http:// or https://.
-    InvalidProtocol,
-    /// The URL ended up redirecting to an URL that does not start
-    /// with http:// or https://.
-    InvalidProtocolInRedirect,
-
+    // TODO: Uncomment these two for 3.0
+    // /// The URL does not start with http:// or https://.
+    // InvalidProtocol,
+    // /// The URL ended up redirecting to an URL that does not start
+    // /// with http:// or https://.
+    // InvalidProtocolInRedirect,
     /// This is a special error case, one that should never be
     /// returned! Think of this as a cleaner alternative to calling
     /// `unreachable!()` inside the library. If you come across this,
@@ -108,8 +109,9 @@ impl fmt::Display for Error {
             BadProxyCreds => write!(f, "the provided proxy credentials are malformed"),
             ProxyConnect => write!(f, "could not connect to the proxy server"),
             InvalidProxyCreds => write!(f, "the provided proxy credentials are invalid"),
-            InvalidProtocol => write!(f, "the url does not start with http:// or https://"),
-            InvalidProtocolInRedirect => write!(f, "got redirected to an absolute url which does not start with http:// or https://"),
+            // TODO: Uncomment these two for 3.0
+            // InvalidProtocol => write!(f, "the url does not start with http:// or https://"),
+            // InvalidProtocolInRedirect => write!(f, "got redirected to an absolute url which does not start with http:// or https://"),
             Other(msg) => write!(f, "error in minreq: please open an issue in the minreq repo, include the following: '{}'", msg),
         }
     }

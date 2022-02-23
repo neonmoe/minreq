@@ -35,6 +35,9 @@ major version bump.
   length. The ability to add maximums was added in response to
   [#55](https://github.com/neonmoe/minreq/issues/55), but defaults for
   the limits is a breaking change.
+- Clearer error when making a request to an url that does not start
+  with `http://` or `https://`.
+- Non-exhaustive error type?
 
 ## License
 This crate is distributed under the terms of the [ISC license](COPYING.md).
