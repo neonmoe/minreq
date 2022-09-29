@@ -17,7 +17,7 @@ const MAX_CONTENT_LENGTH: usize = 16 * 1024;
 /// println!("{}", response.as_str()?);
 /// # Ok(()) }
 /// ```
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Response {
     /// The status code of the response, eg. 404.
     pub status_code: i32,
