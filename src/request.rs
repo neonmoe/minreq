@@ -4,12 +4,13 @@ use crate::proxy::Proxy;
 use crate::{Error, Response, ResponseLazy};
 use std::collections::HashMap;
 use std::fmt;
+use std::fmt::Write;
 
 /// A URL type for requests.
 pub type URL = String;
 
 /// An HTTP request method.
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Method {
     /// The GET method
     Get,
@@ -85,7 +86,7 @@ impl Port {
 /// [`send`](struct.Request.html#method.send) or
 /// [`send_lazy`](struct.Request.html#method.send_lazy) on it, as it
 /// doesn't do much on its own.
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Request {
     pub(crate) method: Method,
     url: URL,
@@ -341,18 +342,20 @@ impl ParsedRequest {
         let mut http = String::with_capacity(32);
 
         // Add the request line and the "Host" header
-        http += &format!(
+        write!(
+            http,
             "{} {} HTTP/1.1\r\nHost: {}",
             self.config.method, self.resource, self.host
-        );
+        )
+        .unwrap();
         if let Port::Explicit(port) = self.port {
-            http += &format!(":{}", port);
+            write!(http, ":{}", port).unwrap();
         }
         http += "\r\n";
 
         // Add other headers
         for (k, v) in &self.config.headers {
-            http += &format!("{}: {}\r\n", k, v);
+            write!(http, "{}: {}\r\n", k, v).unwrap();
         }
 
         if self.config.method == Method::Post
