@@ -4,6 +4,8 @@ use crate::request::ParsedRequest;
 use crate::{Error, Method, ResponseLazy};
 #[cfg(feature = "native-tls")]
 use native_tls::{TlsConnector, TlsStream};
+#[cfg(feature = "https-rustls")]
+use once_cell::sync::Lazy;
 #[cfg(feature = "rustls")]
 use rustls::{
     self, ClientConfig, ClientConnection, OwnedTrustAnchor, RootCertStore, ServerName, StreamOwned,
@@ -22,36 +24,34 @@ use webpki::TrustAnchor;
 use webpki_roots::TLS_SERVER_ROOTS;
 
 #[cfg(feature = "rustls")]
-lazy_static::lazy_static! {
-    static ref CONFIG: Arc<ClientConfig> = {
-        let mut root_certificates = RootCertStore::empty();
+static CONFIG: Lazy<Arc<ClientConfig>> = Lazy::new(|| {
+    let mut root_certificates = RootCertStore::empty();
 
-        // Try to load native certs
-        #[cfg(feature = "https-rustls-probe")]
-        if let Ok(os_roots) = rustls_native_certs::load_native_certs() {
-            for root_cert in os_roots {
-                // Ignore erroneous OS certificates, there's nothing
-                // to do differently in that situation anyways.
-                let _ = root_certificates.add(&rustls::Certificate(root_cert.0));
-            }
+    // Try to load native certs
+    #[cfg(feature = "https-rustls-probe")]
+    if let Ok(os_roots) = rustls_native_certs::load_native_certs() {
+        for root_cert in os_roots {
+            // Ignore erroneous OS certificates, there's nothing
+            // to do differently in that situation anyways.
+            let _ = root_certificates.add(&rustls::Certificate(root_cert.0));
         }
+    }
 
-        let create_owned_trust_anchor = |ta: &TrustAnchor| {
-            OwnedTrustAnchor::from_subject_spki_name_constraints(
-                ta.subject,
-                ta.spki,
-                ta.name_constraints,
-            )
-        };
-        root_certificates
-            .add_server_trust_anchors(TLS_SERVER_ROOTS.0.iter().map(create_owned_trust_anchor));
-        let config = ClientConfig::builder()
-            .with_safe_defaults()
-            .with_root_certificates(root_certificates)
-            .with_no_client_auth();
-        Arc::new(config)
+    let create_owned_trust_anchor = |ta: &TrustAnchor| {
+        OwnedTrustAnchor::from_subject_spki_name_constraints(
+            ta.subject,
+            ta.spki,
+            ta.name_constraints,
+        )
     };
-}
+    root_certificates
+        .add_server_trust_anchors(TLS_SERVER_ROOTS.0.iter().map(create_owned_trust_anchor));
+    let config = ClientConfig::builder()
+        .with_safe_defaults()
+        .with_root_certificates(root_certificates)
+        .with_no_client_auth();
+    Arc::new(config)
+});
 
 type UnsecuredStream = BufReader<TcpStream>;
 #[cfg(feature = "rustls")]
