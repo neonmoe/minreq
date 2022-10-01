@@ -1,6 +1,6 @@
 use crate::{connection::HttpStream, Error};
 use std::collections::HashMap;
-use std::io::{Bytes, ErrorKind, Read};
+use std::io::{self, Bytes, ErrorKind, Read};
 use std::str;
 
 const MAX_CONTENT_LENGTH: usize = 16 * 1024;
@@ -270,6 +270,31 @@ impl Iterator for ResponseLazy {
                 )
             }
         }
+    }
+}
+
+impl Read for ResponseLazy {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        let mut index = 0;
+        for res in self {
+            // there is no use for the estimated length in the read implementation
+            // so it is ignored.
+            let (byte, _) = res.map_err(|e| match e {
+                Error::IoError(e) => e,
+                _ => io::Error::new(io::ErrorKind::Other, e),
+            })?;
+
+            buf[index] = byte;
+            index += 1;
+
+            // if the buffer is full, it should stop reading
+            if index >= buf.len() {
+                break;
+            }
+        }
+
+        // index of the next byte is the number of bytes thats have been read
+        Ok(index)
     }
 }
 
