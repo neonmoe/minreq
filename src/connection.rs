@@ -1,9 +1,10 @@
-#[cfg(feature = "openssl")]
+#[cfg(all(
+    not(feature = "rustls"),
+    any(feature = "openssl", feature = "native-tls")
+))]
 use crate::native_tls::{TlsConnector, TlsStream};
 use crate::request::ParsedRequest;
 use crate::{Error, Method, ResponseLazy};
-#[cfg(feature = "native-tls")]
-use native_tls::{TlsConnector, TlsStream};
 #[cfg(feature = "https-rustls")]
 use once_cell::sync::Lazy;
 #[cfg(feature = "rustls")]
@@ -56,7 +57,10 @@ static CONFIG: Lazy<Arc<ClientConfig>> = Lazy::new(|| {
 type UnsecuredStream = BufReader<TcpStream>;
 #[cfg(feature = "rustls")]
 type SecuredStream = StreamOwned<ClientConnection, TcpStream>;
-#[cfg(any(feature = "openssl", feature = "native-tls"))]
+#[cfg(all(
+    not(feature = "rustls"),
+    any(feature = "openssl", feature = "native-tls")
+))]
 type SecuredStream = TlsStream<TcpStream>;
 
 pub(crate) enum HttpStream {
@@ -191,7 +195,10 @@ impl Connection {
 
     /// Sends the [`Request`](struct.Request.html), consumes this
     /// connection, and returns a [`Response`](struct.Response.html).
-    #[cfg(any(feature = "openssl", feature = "native-tls"))]
+    #[cfg(all(
+        not(feature = "rustls"),
+        any(feature = "openssl", feature = "native-tls")
+    ))]
     pub(crate) fn send_https(mut self) -> Result<ResponseLazy, Error> {
         enforce_timeout(self.timeout_at, move || {
             self.request.host = ensure_ascii_host(self.request.host)?;

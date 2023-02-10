@@ -240,7 +240,7 @@ mod native_tls;
 #[cfg(feature = "openssl")]
 #[macro_use]
 extern crate log;
-#[cfg(feature = "native-tls")]
+#[cfg(all(feature = "native-tls", not(feature = "openssl")))]
 extern crate native_tls;
 #[cfg(feature = "openssl-probe")]
 extern crate openssl_probe;
