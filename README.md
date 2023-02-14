@@ -39,5 +39,13 @@ major version bump.
   with `http://` or `https://`.
 - Non-exhaustive error type?
 
+## Minimum Supported Rust Version (MSRV)
+
+We use an MSRV per major release, i.e., with a new major release we
+reserve the right to change the MSRV.
+
+The current major version (v2) of this library should always compile
+with any combination of features **excluding TLS** on **Rust 1.48**.
+
 ## License
 This crate is distributed under the terms of the [ISC license](COPYING.md).
