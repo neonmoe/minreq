@@ -200,16 +200,11 @@ fn tcp_connect_timeout() {
         .with_timeout(1)
         .send();
     assert!(resp.is_err());
-    assert_eq!(
-        format!("{:?}", resp.err().unwrap()),
-        format!(
-            "{:?}",
-            minreq::Error::IoError(io::Error::new(
-                io::ErrorKind::TimedOut,
-                "the timeout of the request was reached"
-            ))
-        )
-    );
+    if let Some(minreq::Error::IoError(err)) = resp.err() {
+        assert_eq!(err.kind(), io::ErrorKind::TimedOut);
+    } else {
+        panic!("timeout test request did not return an error");
+    }
 }
 
 #[test]
@@ -219,10 +214,7 @@ fn test_header_cap() {
         .with_max_headers_size(999)
         .send();
     assert!(body.is_err());
-    assert_eq!(
-        format!("{:?}", body.err().unwrap()),
-        format!("{:?}", minreq::Error::HeadersOverflow)
-    );
+    assert!(matches!(body.err(), Some(minreq::Error::HeadersOverflow)));
 
     let body = minreq::get(url("/long_header"))
         .with_max_headers_size(1500)
@@ -239,10 +231,10 @@ fn test_status_line_cap() {
         .with_max_status_line_length(expected_status_line.len() + 1)
         .send();
     assert!(body.is_err());
-    assert_eq!(
-        format!("{:?}", body.err().unwrap()),
-        format!("{:?}", minreq::Error::StatusLineOverflow)
-    );
+    assert!(matches!(
+        body.err(),
+        Some(minreq::Error::StatusLineOverflow)
+    ));
 
     let body = minreq::get(url("/long_status_line"))
         .with_max_status_line_length(expected_status_line.len() + 2)

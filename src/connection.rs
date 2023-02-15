@@ -284,7 +284,7 @@ impl Connection {
             let stream = if let Some(timeout) = self.timeout()? {
                 TcpStream::connect_timeout(&sock_address, timeout)
             } else {
-                TcpStream::connect(&sock_address)
+                TcpStream::connect(sock_address)
             };
             stream.map_err(Error::from)
         };

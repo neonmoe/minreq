@@ -100,7 +100,7 @@ impl Proxy {
         let authorization = if self.use_authorization() {
             match self.kind {
                 ProxyKind::Basic => {
-                    let creds = base64::encode(&format!(
+                    let creds = base64::encode(format!(
                         "{}:{}",
                         self.user.clone().unwrap_or_default(),
                         self.password.clone().unwrap_or_default()
