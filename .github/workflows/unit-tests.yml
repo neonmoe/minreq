@@ -13,7 +13,11 @@ jobs:
   test-linux:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - name: Checkout Crate
+      uses: actions/checkout@v3
+    - name: Set Toolchain
+      # https://github.com/dtolnay/rust-toolchain
+      uses: dtolnay/rust-toolchain@stable
     - name: Build
       run: cargo build
     - name: Test
@@ -32,7 +36,10 @@ jobs:
   test-windows:
     runs-on: windows-latest
     steps:
-    - uses: actions/checkout@v2
+    - name: Checkout Crate
+      uses: actions/checkout@v3
+    - name: Set Toolchain
+      uses: dtolnay/rust-toolchain@stable
     - name: Build
       run: cargo build
     - name: Test
@@ -47,7 +54,10 @@ jobs:
   test-macos:
     runs-on: macos-latest
     steps:
-    - uses: actions/checkout@v2
+    - name: Checkout Crate
+      uses: actions/checkout@v3
+    - name: Set Toolchain
+      uses: dtolnay/rust-toolchain@stable
     - name: Build
       run: cargo build
     - name: Test
