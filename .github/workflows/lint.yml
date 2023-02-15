@@ -13,7 +13,11 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - name: Checkout Crate
+      uses: actions/checkout@v3
+    - name: Set Toolchain
+      # https://github.com/dtolnay/rust-toolchain
+      uses: dtolnay/rust-toolchain@stable
     - name: Run rustfmt
       run: rustfmt --check src/lib.rs
     - name: Run cargo doc
