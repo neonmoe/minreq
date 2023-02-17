@@ -1,8 +1,9 @@
 use crate::{connection::HttpStream, Error};
 use std::collections::HashMap;
-use std::io::{self, Bytes, ErrorKind, Read};
+use std::io::{self, BufReader, Bytes, ErrorKind, Read};
 use std::str;
 
+const BACKING_READ_BUFFER_LENGTH: usize = 16 * 1024;
 const MAX_CONTENT_LENGTH: usize = 16 * 1024;
 
 /// An HTTP response.
@@ -220,10 +221,12 @@ pub struct ResponseLazy {
     /// keys) are all lowercase.
     pub headers: HashMap<String, String>,
 
-    stream: Bytes<HttpStream>,
+    stream: HttpStreamBytes,
     state: HttpStreamState,
     max_trailing_headers_size: Option<usize>,
 }
+
+type HttpStreamBytes = Bytes<BufReader<HttpStream>>;
 
 impl ResponseLazy {
     pub(crate) fn from_stream(
@@ -231,7 +234,7 @@ impl ResponseLazy {
         max_headers_size: Option<usize>,
         max_status_line_len: Option<usize>,
     ) -> Result<ResponseLazy, Error> {
-        let mut stream = stream.bytes();
+        let mut stream = BufReader::with_capacity(BACKING_READ_BUFFER_LENGTH, stream).bytes();
         let ResponseMetadata {
             status_code,
             reason_phrase,
@@ -298,7 +301,7 @@ impl Read for ResponseLazy {
     }
 }
 
-fn read_until_closed(bytes: &mut Bytes<HttpStream>) -> Option<<ResponseLazy as Iterator>::Item> {
+fn read_until_closed(bytes: &mut HttpStreamBytes) -> Option<<ResponseLazy as Iterator>::Item> {
     if let Some(byte) = bytes.next() {
         match byte {
             Ok(byte) => Some(Ok((byte, 1))),
@@ -310,7 +313,7 @@ fn read_until_closed(bytes: &mut Bytes<HttpStream>) -> Option<<ResponseLazy as I
 }
 
 fn read_with_content_length(
-    bytes: &mut Bytes<HttpStream>,
+    bytes: &mut HttpStreamBytes,
     content_length: &mut usize,
 ) -> Option<<ResponseLazy as Iterator>::Item> {
     if *content_length > 0 {
@@ -328,7 +331,7 @@ fn read_with_content_length(
 }
 
 fn read_trailers(
-    bytes: &mut Bytes<HttpStream>,
+    bytes: &mut HttpStreamBytes,
     headers: &mut HashMap<String, String>,
     mut max_headers_size: Option<usize>,
 ) -> Result<(), Error> {
@@ -347,7 +350,7 @@ fn read_trailers(
 }
 
 fn read_chunked(
-    bytes: &mut Bytes<HttpStream>,
+    bytes: &mut HttpStreamBytes,
     headers: &mut HashMap<String, String>,
     expecting_more_chunks: &mut bool,
     chunk_length: &mut usize,
@@ -456,7 +459,7 @@ struct ResponseMetadata {
 }
 
 fn read_metadata(
-    stream: &mut Bytes<HttpStream>,
+    stream: &mut HttpStreamBytes,
     mut max_headers_size: Option<usize>,
     max_status_line_len: Option<usize>,
 ) -> Result<ResponseMetadata, Error> {
@@ -515,7 +518,7 @@ fn read_metadata(
 }
 
 fn read_line(
-    stream: &mut Bytes<HttpStream>,
+    stream: &mut HttpStreamBytes,
     max_len: Option<usize>,
     overflow_error: Error,
 ) -> Result<String, Error> {
