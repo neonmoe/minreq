@@ -5,6 +5,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
+- From lazy_static to once_cell for library internals. Thanks for the PR,
+  @alpha-tango-kilo! ([#80](https://github.com/neonmoe/minreq/pull/80))
+
+### Added
+- A Read impl for ResponseLazy. Thanks for the PR, @Luro02!
+  ([#81](https://github.com/neonmoe/minreq/pull/81))
+- Building with `--all-features`, with the `send_https` function defaulting to
+  the rustls-based implementation. Thanks for the PR, @tcharding!
+  ([#89](https://github.com/neonmoe/minreq/pull/89))
+- An explicit minimum supported rust version policy. The MSRV for versions 2.x
+  is 1.48. Thanks for the suggetsion and PR, @tcharding!
+  ([#90](https://github.com/neonmoe/minreq/pull/90))
+- Performance improvements, test fixes, CI updates.
 
 ## [2.6.0] - 2022-02-23
 ### Changed
