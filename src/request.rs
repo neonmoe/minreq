@@ -169,6 +169,12 @@ impl Request {
         self
     }
 
+    /// Adds given auth string to the authorization header.
+    pub fn with_basic_auth(mut self, auth: String) -> Request {
+        self.headers.insert("Authorization".to_string(), auth);
+        self
+    }
+
     /// Converts given argument to JSON and sets it as body.
     ///
     /// # Errors
