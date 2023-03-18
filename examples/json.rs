@@ -1,6 +1,6 @@
 /// This example demonstrates the `json-using-serde` feature.
 
-#[derive(serde_derive::Deserialize)]
+#[derive(serde::Deserialize)]
 struct Response {
     data: String,
 }

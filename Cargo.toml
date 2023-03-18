@@ -39,8 +39,7 @@ native-tls = { version = "0.2", optional = true }
 
 [dev-dependencies]
 tiny_http = "0.8.2"
-serde_derive = "1.0.101"
-env_logger = "0.8.3"
+serde = { version = "=1.0.156", features = ["derive"] }
 
 [package.metadata.docs.rs]
 features = ["json-using-serde", "proxy", "https", "punycode"]

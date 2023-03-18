@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the rustls-based implementation. Thanks for the PR, @tcharding!
   ([#89](https://github.com/neonmoe/minreq/pull/89))
 - An explicit minimum supported rust version policy. The MSRV for versions 2.x
-  is 1.48. Thanks for the suggetsion and PR, @tcharding!
+  is 1.48. Thanks for the suggestion and PR, @tcharding!
   ([#90](https://github.com/neonmoe/minreq/pull/90))
 - Performance improvements, test fixes, CI updates.
 

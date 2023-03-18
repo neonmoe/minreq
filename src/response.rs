@@ -143,7 +143,7 @@ impl Response {
     /// In case compiler cannot figure out return type you might need to declare it explicitly:
     ///
     /// ```no_run
-    /// use serde_derive::Deserialize;
+    /// use serde::Deserialize;
     ///
     /// #[derive(Deserialize)]
     /// struct User {

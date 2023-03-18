@@ -2,7 +2,7 @@ extern crate minreq;
 mod setup;
 
 #[cfg(feature = "json-using-serde")]
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 use self::setup::*;
 use std::io;
