@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [2.7.0] - 2023-03-19
 ### Changed
 - From lazy_static to once_cell for library internals. Thanks for the PR,
   @alpha-tango-kilo! ([#80](https://github.com/neonmoe/minreq/pull/80))
