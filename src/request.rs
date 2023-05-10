@@ -125,7 +125,11 @@ impl Request {
             max_status_line_len: None,
             max_redirects: 100,
             #[cfg(feature = "proxy")]
-            proxy: None,
+            proxy: std::env::var("MINREQ_PROXY")
+                .map_err(|_| std::env::var("HTTPS_PROXY")
+                .map_err(|_| std::env::var("HTTP_PROXY")))
+                .map(|proxy| Proxy::new(proxy).map(Some).unwrap_or(None))
+                .unwrap_or(None)
         }
     }
 
