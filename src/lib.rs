@@ -21,7 +21,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! minreq = { version = "2.8.0", features = ["punycode"] }
+//! minreq = { version = "2.8.1-alpha", features = ["punycode"] }
 //! ```
 //!
 //! Below is the list of all available features.
