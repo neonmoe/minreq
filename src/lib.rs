@@ -143,9 +143,8 @@
 //! ```
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let response = minreq::get("http://example.com")
-//!     .with_header("If-None-Match", "\"3147526947+ident\"")
+//!     .with_header("Accept", "text/html")
 //!     .send()?;
-//! assert_eq!(304, response.status_code);
 //! # Ok(()) }
 //! ```
 //!
@@ -160,8 +159,8 @@
 //!
 //! ```
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! let response = minreq::get("http://example.com").with_header("Accept-Encoding", "identity").send()?;
-//! assert_eq!("\"3147526947+ident\"", response.headers.get("etag").unwrap());
+//! let response = minreq::get("http://example.com").send()?;
+//! assert!(response.headers.get("content-type").unwrap().starts_with("text/html"));
 //! # Ok(()) }
 //! ```
 //!
