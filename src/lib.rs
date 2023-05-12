@@ -111,10 +111,10 @@
 //!
 //! ```
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! let response = minreq::get("http://httpbin.org/ip").send()?;
-//! assert!(response.as_str()?.contains("\"origin\":"));
-//! assert_eq!(response.status_code, 200);
-//! assert_eq!(response.reason_phrase, "OK");
+//! let response = minreq::get("http://example.com").send()?;
+//! assert!(response.as_str()?.contains("</html>"));
+//! assert_eq!(200, response.status_code);
+//! assert_eq!("OK", response.reason_phrase);
 //! # Ok(()) }
 //! ```
 //!
@@ -129,10 +129,9 @@
 //!
 //! ```
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! let response = minreq::post("http://httpbin.org/post")
+//! let response = minreq::post("http://example.com")
 //!     .with_body("Foobar")
 //!     .send()?;
-//! assert!(response.as_str()?.contains("Foobar"));
 //! # Ok(()) }
 //! ```
 //!
@@ -143,13 +142,10 @@
 //!
 //! ```
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! let response = minreq::get("http://httpbin.org/headers")
-//!     .with_header("Accept", "text/plain")
-//!     .with_header("X-Best-Mon", "Sylveon")
+//! let response = minreq::get("http://example.com")
+//!     .with_header("If-None-Match", "\"3147526947+ident\"")
 //!     .send()?;
-//! let body_str = response.as_str()?;
-//! assert!(body_str.contains("\"Accept\": \"text/plain\""));
-//! assert!(body_str.contains("\"X-Best-Mon\": \"Sylveon\""));
+//! assert_eq!(304, response.status_code);
 //! # Ok(()) }
 //! ```
 //!
@@ -164,8 +160,8 @@
 //!
 //! ```
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! let response = minreq::get("http://httpbin.org/ip").send()?;
-//! assert_eq!(response.headers.get("content-type").unwrap(), "application/json");
+//! let response = minreq::get("http://example.com").with_header("Accept-Encoding", "identity").send()?;
+//! assert_eq!("\"3147526947+ident\"", response.headers.get("etag").unwrap());
 //! # Ok(()) }
 //! ```
 //!
@@ -178,10 +174,9 @@
 //!
 //! ```no_run
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! let response = minreq::post("http://httpbin.org/delay/6")
+//! let response = minreq::post("http://example.com")
 //!     .with_timeout(10)
 //!     .send()?;
-//! println!("{}", response.as_str()?);
 //! # Ok(()) }
 //! ```
 //!
@@ -199,7 +194,7 @@
 //! #[cfg(feature = "proxy")]
 //! {
 //!     let proxy = minreq::Proxy::new("localhost:8080")?;
-//!     let response = minreq::post("http://httpbin.org/delay/1")
+//!     let response = minreq::post("http://example.com")
 //!         .with_proxy(proxy)
 //!         .send()?;
 //!     println!("{}", response.as_str()?);

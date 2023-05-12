@@ -2,6 +2,7 @@
 
 #[derive(serde::Deserialize)]
 struct Response {
+    /// The field in which `http://httpbin.org/anything` returns the body.
     data: String,
 }
 
@@ -10,6 +11,6 @@ fn main() -> Result<(), minreq::Error> {
         .with_body("Hello, world!")
         .send()?;
     let json: Response = response.json()?;
-    println!("{}", json.data);
+    println!("Hello, world! == {}", &json.data);
     Ok(())
 }

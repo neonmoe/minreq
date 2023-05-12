@@ -3,7 +3,7 @@
 
 fn main() -> Result<(), minreq::Error> {
     let mut buffer = Vec::new();
-    for byte in minreq::get("http://httpbin.org/get").send_lazy()? {
+    for byte in minreq::get("http://example.com").send_lazy()? {
         // The connection could have a problem at any point during the
         // download, so each byte needs to be unwrapped. An IO error
         // of the WouldBlock kind may also be returned, but it is not
@@ -52,5 +52,5 @@ fn sleep() {
     use std::thread::sleep;
     use std::time::Duration;
 
-    sleep(Duration::from_millis(5));
+    sleep(Duration::from_millis(2));
 }

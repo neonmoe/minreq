@@ -12,8 +12,8 @@ use std::io;
 fn test_https() {
     // TODO: Implement this locally.
     assert_eq!(
-        get_status_code(minreq::get("https://httpbin.org/status/418").send()),
-        418
+        get_status_code(minreq::get("https://example.com").send()),
+        200,
     );
 }
 

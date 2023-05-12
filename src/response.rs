@@ -201,7 +201,7 @@ impl Response {
 /// // This is how the normal Response works behind the scenes, and
 /// // how you might use ResponseLazy.
 /// # fn main() -> Result<(), minreq::Error> {
-/// let response = minreq::get("http://httpbin.org/ip").send_lazy()?;
+/// let response = minreq::get("http://example.com").send_lazy()?;
 /// let mut vec = Vec::new();
 /// for result in response {
 ///     let (byte, length) = result?;
