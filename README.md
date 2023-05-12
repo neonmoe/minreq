@@ -1,7 +1,8 @@
 # minreq
 [![Crates.io](https://img.shields.io/crates/d/minreq.svg)](https://crates.io/crates/minreq)
 [![Documentation](https://docs.rs/minreq/badge.svg)](https://docs.rs/minreq)
-[![CI](	https://img.shields.io/travis/neonmoe/minreq.svg)](https://travis-ci.org/neonmoe/minreq)
+![Unit tests](https://github.com/neonmoe/minreq/actions/workflows/unit-tests.yml/badge.svg)
+![MSRV](https://github.com/neonmoe/minreq/actions/workflows/msrv.yml/badge.svg)
 
 Simple, minimal-dependency HTTP client. Optional features for json
 responses (`json-using-serde`), unicode domains (`punycode`), http
