@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.8.0] - 2023-05-13
+### Added
+- Default proxy from environment variables when the `proxy` feature is
+  enabled, based on what curl does. Thanks for the PR, @krypt0nn!
+  ([#94](https://github.com/neonmoe/minreq/pull/94))
+
 ## [2.7.0] - 2023-03-19
 ### Changed
 - From lazy_static to once_cell for library internals. Thanks for the PR,
