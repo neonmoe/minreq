@@ -120,6 +120,7 @@ impl Proxy {
     }
 }
 
+#[allow(clippy::manual_split_once)]
 /// Replacement for str::split_once until MSRV is at least 1.52.0.
 fn split_once<'a>(string: &'a str, pattern: &str) -> Option<(&'a str, &'a str)> {
     let mut parts = string.splitn(2, pattern);
@@ -128,6 +129,7 @@ fn split_once<'a>(string: &'a str, pattern: &str) -> Option<(&'a str, &'a str)> 
     Some((first, second))
 }
 
+#[allow(clippy::manual_split_once)]
 /// Replacement for str::rsplit_once until MSRV is at least 1.52.0.
 fn rsplit_once<'a>(string: &'a str, pattern: &str) -> Option<(&'a str, &'a str)> {
     let mut parts = string.rsplitn(2, pattern);
