@@ -23,7 +23,7 @@ pub struct Proxy {
 
 impl Proxy {
     fn parse_creds(creds: &str) -> (Option<String>, Option<String>) {
-        if let Some((user, pass)) = creds.split_once(':') {
+        if let Some((user, pass)) = split_once(creds, ":") {
             (Some(user.to_string()), Some(pass.to_string()))
         } else {
             (Some(creds.to_string()), None)
@@ -31,7 +31,7 @@ impl Proxy {
     }
 
     fn parse_address(host: &str) -> Result<(String, Option<u32>), Error> {
-        if let Some((host, port)) = host.split_once(':') {
+        if let Some((host, port)) = split_once(host, ":") {
             let port = port.parse::<u32>().map_err(|_| Error::BadProxy)?;
             Ok((host.to_string(), Some(port)))
         } else {
@@ -58,7 +58,7 @@ impl Proxy {
     ///
     pub fn new<S: AsRef<str>>(proxy: S) -> Result<Self, Error> {
         let proxy = proxy.as_ref();
-        let authority = if let Some((proto, auth)) = proxy.split_once("://") {
+        let authority = if let Some((proto, auth)) = split_once(proxy, "://") {
             if proto != "http" {
                 return Err(Error::BadProxy);
             }
@@ -67,7 +67,7 @@ impl Proxy {
             proxy
         };
 
-        let ((user, password), host) = if let Some((userinfo, host)) = authority.rsplit_once('@') {
+        let ((user, password), host) = if let Some((userinfo, host)) = rsplit_once(authority, "@") {
             (Proxy::parse_creds(userinfo), host)
         } else {
             ((None, None), authority)
@@ -89,7 +89,7 @@ impl Proxy {
             match self.kind {
                 ProxyKind::Basic => {
                     let creds = if let Some(password) = &self.password {
-                        base64::encode(format!("{user}:{password}"))
+                        base64::encode(format!("{}:{}", user, password))
                     } else {
                         base64::encode(user)
                     };
@@ -101,7 +101,10 @@ impl Proxy {
         };
         let host = &proxied_req.host;
         let port = proxied_req.port.port();
-        format!("CONNECT {host}:{port} HTTP/1.1\r\n{authorization}\r\n")
+        format!(
+            "CONNECT {}:{} HTTP/1.1\r\n{}\r\n",
+            host, port, authorization
+        )
     }
 
     pub(crate) fn verify_response(response: &[u8]) -> Result<(), Error> {
@@ -115,6 +118,22 @@ impl Proxy {
             _ => Err(Error::BadProxy),
         }
     }
+}
+
+/// Replacement for str::split_once until MSRV is at least 1.52.0.
+fn split_once<'a>(string: &'a str, pattern: &str) -> Option<(&'a str, &'a str)> {
+    let mut parts = string.splitn(2, pattern);
+    let first = parts.next()?;
+    let second = parts.next()?;
+    Some((first, second))
+}
+
+/// Replacement for str::rsplit_once until MSRV is at least 1.52.0.
+fn rsplit_once<'a>(string: &'a str, pattern: &str) -> Option<(&'a str, &'a str)> {
+    let mut parts = string.rsplitn(2, pattern);
+    let second = parts.next()?;
+    let first = parts.next()?;
+    Some((first, second))
 }
 
 #[cfg(test)]
