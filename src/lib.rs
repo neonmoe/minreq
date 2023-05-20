@@ -92,7 +92,7 @@
 //!
 //! ## `proxy`
 //!
-//! This feature enables proxy support.
+//! This feature enables HTTP proxy support. See [Proxy].
 //!
 //! ## `urlencoding`
 //!

@@ -58,8 +58,8 @@ pub enum Error {
     /// characters, but it could not be converted into punycode
     /// because the `punycode` feature was not enabled.
     PunycodeFeatureNotEnabled,
-    /// The provided proxy information was not properly formatted.
-    /// Supported proxy format is `[user:password@]host:port`.
+    /// The provided proxy information was not properly formatted. See
+    /// [Proxy::new](crate::Proxy::new) for the valid format.
     BadProxy,
     /// The provided credentials were rejected by the proxy server.
     BadProxyCreds,

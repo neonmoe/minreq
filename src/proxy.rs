@@ -1,4 +1,5 @@
 use crate::error::Error;
+use crate::ParsedRequest;
 
 /// Kind of proxy connection (Basic, Digest, etc)
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -6,7 +7,11 @@ pub(crate) enum ProxyKind {
     Basic,
 }
 
-/// Proxy server definition
+/// Proxy configuration. Only HTTP CONNECT proxies are supported (no SOCKS or
+/// HTTPS).
+///
+/// When credentials are provided, the Basic authentication type is used for
+/// Proxy-Authorization.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Proxy {
     pub(crate) server: String,
@@ -17,78 +22,61 @@ pub struct Proxy {
 }
 
 impl Proxy {
-    fn parse_creds<S: AsRef<str>>(
-        creds: &Option<S>,
-    ) -> Result<(Option<String>, Option<String>), Error> {
-        match creds {
-            Some(creds) => {
-                let mut parts = creds
-                    .as_ref()
-                    .splitn(2, ':')
-                    .collect::<Vec<&str>>()
-                    .into_iter();
-
-                if parts.len() != 2 {
-                    Err(Error::BadProxyCreds)
-                } else {
-                    Ok((
-                        parts.next().map(String::from),
-                        parts.next().map(String::from),
-                    ))
-                }
-            }
-            None => Ok((None, None)),
+    fn parse_creds(creds: &str) -> (Option<String>, Option<String>) {
+        if let Some((user, pass)) = creds.split_once(':') {
+            (Some(user.to_string()), Some(pass.to_string()))
+        } else {
+            (Some(creds.to_string()), None)
         }
     }
 
-    fn parse_address<S: AsRef<str>>(host: &Option<S>) -> Result<(String, Option<u32>), Error> {
-        match host {
-            Some(host) => {
-                let mut parts = host.as_ref().split(':').collect::<Vec<&str>>().into_iter();
-                let host = parts.next().ok_or(Error::BadProxy)?;
-                let port = parts.next();
-                Ok((
-                    String::from(host),
-                    port.and_then(|port| port.parse::<u32>().ok()),
-                ))
-            }
-            None => Err(Error::BadProxy),
+    fn parse_address(host: &str) -> Result<(String, Option<u32>), Error> {
+        if let Some((host, port)) = host.split_once(':') {
+            let port = port.parse::<u32>().map_err(|_| Error::BadProxy)?;
+            Ok((host.to_string(), Some(port)))
+        } else {
+            Ok((host.to_string(), None))
         }
     }
 
-    fn use_authorization(&self) -> bool {
-        self.user.is_some() && self.password.is_some()
-    }
-
-    /// A proxy server
+    /// Creates a new Proxy configuration.
     ///
-    /// Create a proxy server to be used with HTTP(S) connections.
+    /// Supported proxy format is:
+    ///
+    /// ```plaintext
+    /// [http://][user[:password]@]host[:port]
+    /// ```
+    ///
+    /// The default port is 8080, to be changed to 1080 in minreq 3.0.
     ///
     /// # Example
     ///
     /// ```
-    /// let proxy = minreq::Proxy::new("user:password@localhost:8080").unwrap();
+    /// let proxy = minreq::Proxy::new("user:password@localhost:1080").unwrap();
     /// let request = minreq::post("http://example.com").with_proxy(proxy);
     /// ```
     ///
     pub fn new<S: AsRef<str>>(proxy: S) -> Result<Self, Error> {
-        let mut parts = proxy
-            .as_ref()
-            .rsplitn(2, '@')
-            .collect::<Vec<&str>>()
-            .into_iter()
-            .rev();
-
-        let (user, password) = if parts.len() == 2 {
-            Proxy::parse_creds(&parts.next())?
+        let proxy = proxy.as_ref();
+        let authority = if let Some((proto, auth)) = proxy.split_once("://") {
+            if proto != "http" {
+                return Err(Error::BadProxy);
+            }
+            auth
         } else {
-            (None, None)
+            proxy
         };
 
-        let (server, port) = Proxy::parse_address(&parts.next())?;
+        let ((user, password), host) = if let Some((userinfo, host)) = authority.rsplit_once('@') {
+            (Proxy::parse_creds(userinfo), host)
+        } else {
+            ((None, None), authority)
+        };
+
+        let (host, port) = Proxy::parse_address(host)?;
 
         Ok(Self {
-            server,
+            server: host,
             user,
             password,
             port: port.unwrap_or(8080),
@@ -96,33 +84,24 @@ impl Proxy {
         })
     }
 
-    pub(crate) fn connect<S: AsRef<str>>(&self, host: S) -> String {
-        let authorization = if self.use_authorization() {
+    pub(crate) fn connect(&self, proxied_req: &ParsedRequest) -> String {
+        let authorization = if let Some(user) = &self.user {
             match self.kind {
                 ProxyKind::Basic => {
-                    let creds = base64::encode(format!(
-                        "{}:{}",
-                        self.user.clone().unwrap_or_default(),
-                        self.password.clone().unwrap_or_default()
-                    ));
-                    format!("Proxy-Authorization: basic {}\r\n", creds)
+                    let creds = if let Some(password) = &self.password {
+                        base64::encode(format!("{user}:{password}"))
+                    } else {
+                        base64::encode(user)
+                    };
+                    format!("Proxy-Authorization: Basic {}\r\n", creds)
                 }
             }
         } else {
             String::new()
         };
-
-        format!(
-            "CONNECT {} HTTP/1.1\r\n\
-Host: {}\r\n\
-User-Agent: something/1.0.0\r\n\
-Proxy-Connection: Keep-Alive\r\n\
-{}\
-\r\n",
-            host.as_ref(),
-            host.as_ref(),
-            authorization
-        )
+        let host = &proxied_req.host;
+        let port = proxied_req.port.port();
+        format!("CONNECT {host}:{port} HTTP/1.1\r\n{authorization}\r\n")
     }
 
     pub(crate) fn verify_response(response: &[u8]) -> Result<(), Error> {
@@ -149,5 +128,14 @@ mod tests {
         assert_eq!(proxy.password, Some(String::from("p@ssw0rd")));
         assert_eq!(proxy.server, String::from("localhost"));
         assert_eq!(proxy.port, 9999);
+    }
+
+    #[test]
+    fn parse_regular_proxy_with_protocol() {
+        let proxy = Proxy::new("http://localhost:1080").unwrap();
+        assert_eq!(proxy.user, None);
+        assert_eq!(proxy.password, None);
+        assert_eq!(proxy.server, String::from("localhost"));
+        assert_eq!(proxy.port, 1080);
     }
 }

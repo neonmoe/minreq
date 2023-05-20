@@ -39,6 +39,8 @@ major version bump.
 - Clearer error when making a request to an url that does not start
   with `http://` or `https://`.
 - Non-exhaustive error type?
+- Change default proxy port to 1080 (from 8080). Curl uses 1080, so it's a sane
+  default.
 
 ## Minimum Supported Rust Version (MSRV)
 
