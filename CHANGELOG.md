@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.8.1] - 2023-05-20
+### Fixed
+- Proxy strings with the protocol included not working. Thanks for the report,
+  @tkkcc! ([#95](https://github.com/neonmoe/minreq/issues/95))
+
 ## [2.8.0] - 2023-05-13
 ### Added
 - Default proxy from environment variables when the `proxy` feature is
