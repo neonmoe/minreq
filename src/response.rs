@@ -65,6 +65,23 @@ impl Response {
         })
     }
 
+    /// Return true if the request's response code is in range 200-299 (HTTP OK)
+    /// 
+    /// Source: https://developer.mozilla.org/en-US/docs/Web/API/Response/ok
+    /// 
+    /// # Example
+    ///
+    /// ```no_run
+    /// let response = minreq::get("http://example.com").send()?;
+    /// 
+    /// if response.is_ok() {
+    ///     println!("Response body: {}", response.as_str().unwrap());
+    /// }
+    /// ```
+    pub fn is_ok(&self) -> bool {
+        (200..299).contains(&self.status_code)
+    }
+
     /// Returns the body as an `&str`.
     ///
     /// # Errors
