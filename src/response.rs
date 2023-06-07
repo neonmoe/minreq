@@ -72,11 +72,14 @@ impl Response {
     /// # Example
     ///
     /// ```no_run
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let response = minreq::get("http://example.com").send()?;
     /// 
     /// if response.is_ok() {
     ///     println!("Response body: {}", response.as_str().unwrap());
     /// }
+    /// # Ok(())
+    /// # }
     /// ```
     pub fn is_ok(&self) -> bool {
         (200..299).contains(&self.status_code)
