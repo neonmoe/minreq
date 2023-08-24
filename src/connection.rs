@@ -19,9 +19,7 @@ use std::net::{TcpStream, ToSocketAddrs};
 #[cfg(feature = "rustls")]
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-#[cfg(feature = "webpki")]
-use webpki::TrustAnchor;
-#[cfg(feature = "webpki")]
+#[cfg(feature = "rustls-webpki")]
 use webpki_roots::TLS_SERVER_ROOTS;
 
 #[cfg(feature = "rustls")]
@@ -38,15 +36,13 @@ static CONFIG: Lazy<Arc<ClientConfig>> = Lazy::new(|| {
         }
     }
 
-    let create_owned_trust_anchor = |ta: &TrustAnchor| {
+    root_certificates.add_trust_anchors(TLS_SERVER_ROOTS.iter().map(|ta| {
         OwnedTrustAnchor::from_subject_spki_name_constraints(
             ta.subject,
             ta.spki,
             ta.name_constraints,
         )
-    };
-    root_certificates
-        .add_server_trust_anchors(TLS_SERVER_ROOTS.0.iter().map(create_owned_trust_anchor));
+    }));
     let config = ClientConfig::builder()
         .with_safe_defaults()
         .with_root_certificates(root_certificates)

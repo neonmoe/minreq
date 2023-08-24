@@ -27,11 +27,11 @@ serde_json = { version = "1.0.41", optional = true }
 # For the proxy feature:
 base64 = { version = "0.12", optional = true }
 # For the https features:
-rustls = { version = "0.20.0", optional = true }
+rustls = { version = "0.21.6", optional = true }
 rustls-native-certs = { version = "0.6.1", optional = true }
 once_cell = { version = "1.14.0", optional = true }
-webpki-roots = { version = "0.22.0", optional = true }
-webpki = { version = "0.22.0", optional = true }
+webpki-roots = { version = "0.25.2", optional = true }
+rustls-webpki = { version = "0.101.4", optional = true }
 openssl = { version = "0.10.29", optional = true }
 log = { version = "0.4.5" }
 openssl-probe = { version = "0.1", optional = true }
@@ -45,8 +45,9 @@ serde = { version = "=1.0.156", features = ["derive"] }
 features = ["json-using-serde", "proxy", "https", "punycode"]
 
 [features]
+default = ["https"]
 https = ["https-rustls"]
-https-rustls = ["rustls", "once_cell", "webpki-roots", "webpki"]
+https-rustls = ["rustls", "once_cell", "webpki-roots", "rustls-webpki"]
 https-rustls-probe = ["https-rustls", "rustls-native-certs"]
 https-bundled = ["openssl/vendored"]
 https-bundled-probe = ["https-bundled", "openssl-probe"]
