@@ -1,6 +1,6 @@
 [package]
 name = "minreq"
-version = "2.8.2-alpha"
+version = "2.9.0"
 authors = ["Jens Pitkanen <jens@neon.moe>"]
 description = "Simple, minimal-dependency HTTP client"
 documentation = "https://docs.rs/minreq"
