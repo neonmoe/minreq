@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   being maintained, @RCasatta!
   ([#98](https://github.com/neonmoe/minreq/issues/98))
 - Updated rustls and webpki-roots to their most recent versions.
+- Maximum versions for the following dependencies to keep minreq compiling on
+  Rust 1.48:
+  - serde_json (`>=1.0.0, <1.0.101`)
+  - log (`>=0.4.0, <0.4.19`)
+  - chrono (dev-dependency, `>=0.4.0, <0.4.24`)
 
 ### Fixed
 - Errors when using an IP address as the host with HTTPS (tested with
