@@ -1,5 +1,7 @@
 // Derived from https://lib.rs/crates/native-tls.
 
+#![allow(warnings)]
+
 use std::any::Any;
 use std::error;
 use std::fmt;

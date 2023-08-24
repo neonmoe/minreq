@@ -39,13 +39,11 @@ native-tls = { version = "0.2", optional = true }
 
 [dev-dependencies]
 tiny_http = "0.8.2"
-serde = { version = "=1.0.156", features = ["derive"] }
 
 [package.metadata.docs.rs]
 features = ["json-using-serde", "proxy", "https", "punycode"]
 
 [features]
-default = ["https"]
 https = ["https-rustls"]
 https-rustls = ["rustls", "once_cell", "webpki-roots", "rustls-webpki"]
 https-rustls-probe = ["https-rustls", "rustls-native-certs"]

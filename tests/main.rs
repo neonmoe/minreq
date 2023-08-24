@@ -1,9 +1,6 @@
 extern crate minreq;
 mod setup;
 
-#[cfg(feature = "json-using-serde")]
-use serde::{Deserialize, Serialize};
-
 use self::setup::*;
 use std::io;
 
@@ -17,28 +14,21 @@ fn test_https() {
     );
 }
 
-#[cfg(feature = "json-using-serde")]
-#[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
-struct Json<'a> {
-    str: &'a str,
-    num: u32,
-}
-
 #[test]
 #[cfg(feature = "json-using-serde")]
 fn test_json_using_serde() {
-    let original_json = Json {
-        str: "Json test",
-        num: 42,
-    };
+    const JSON_SRC: &str = r#"{
+        "str": "Json test",
+        "num": 42
+    }"#;
 
+    let original_json: serde_json::Value = serde_json::from_str(JSON_SRC).unwrap();
     let response = minreq::post(url("/echo"))
         .with_json(&original_json)
         .unwrap()
         .send()
         .unwrap();
-    let actual_json: Json = response.json().unwrap();
-
+    let actual_json: serde_json::Value = response.json().unwrap();
     assert_eq!(&actual_json, &original_json);
 }
 

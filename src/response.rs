@@ -143,20 +143,13 @@ impl Response {
     /// In case compiler cannot figure out return type you might need to declare it explicitly:
     ///
     /// ```no_run
-    /// use serde::Deserialize;
-    ///
-    /// #[derive(Deserialize)]
-    /// struct User {
-    ///     name: String,
-    ///     email: String,
-    /// }
+    /// use serde_json::Value;
     ///
     /// # fn main() -> Result<(), minreq::Error> {
     /// # let url_to_json_resource = "http://example.org/resource.json";
-    /// let user_name = minreq::get(url_to_json_resource).send()?
-    ///     .json::<User>()? // explicitly declared type `User`
-    ///     .name;
-    /// println!("User name is '{}'", &user_name);
+    /// // Value could be any type that implements Deserialize!
+    /// let user = minreq::get(url_to_json_resource).send()?.json::<Value>()?;
+    /// println!("User name is '{}'", user["name"]);
     /// # Ok(())
     /// # }
     /// ```
