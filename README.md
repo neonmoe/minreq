@@ -41,6 +41,9 @@ major version bump.
 - Non-exhaustive error type?
 - Change default proxy port to 1080 (from 8080). Curl uses 1080, so it's a sane
   default.
+- Bump MSRV enough to compile the latest versions of all dependencies, and add
+  the `rust-version` (at least 1.56) and `edition` (at least 2021) fields to
+  Cargo.toml.
 
 ## Minimum Supported Rust Version (MSRV)
 
