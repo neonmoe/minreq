@@ -36,6 +36,7 @@ static CONFIG: Lazy<Arc<ClientConfig>> = Lazy::new(|| {
         }
     }
 
+    #[allow(deprecated)] // Need to use add_server_trust_anchors to compile with rustls 0.21.1
     root_certificates.add_server_trust_anchors(TLS_SERVER_ROOTS.iter().map(|ta| {
         OwnedTrustAnchor::from_subject_spki_name_constraints(
             ta.subject,
