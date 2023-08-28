@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.9.1] - 2023-08-28
+### Changed
+- Loosened the rustls version requirement from 0.21.6 to 0.21.1.
+
 ## [2.9.0] - 2023-08-24
 ### Changed
 - From webpki to rustls-webpki. Thanks for the heads-up about webpki not
