@@ -152,13 +152,14 @@ impl Request {
     /// key or value.
     ///
     /// If `urlencoding` is enabled, the key and value are both encoded.
-    pub fn with_param<T: Into<String>, U: Into<String>>(mut self, key: T, value: U) -> Request {
-        let key = key.into();
+    #[cfg_attr(not(urlencoding), allow(clippy::needless_borrow))]
+    pub fn with_param<T: AsRef<str>, U: AsRef<str>>(mut self, key: T, value: U) -> Request {
+        let key = key.as_ref();
         #[cfg(feature = "urlencoding")]
-        let key = urlencoding::encode(&key);
-        let value = value.into();
+        let key = urlencoding::encode(key);
+        let value = value.as_ref();
         #[cfg(feature = "urlencoding")]
-        let value = urlencoding::encode(&value);
+        let value = urlencoding::encode(value);
 
         if !self.params.is_empty() {
             self.params.push('&');
@@ -490,13 +491,14 @@ impl ParsedRequest {
     }
 }
 
-fn parse_url(url: &str) -> Result<(bool, URL, Port, URL), Error> {
+fn parse_url(url: impl AsRef<str>) -> Result<(bool, URL, Port, URL), Error> {
     enum UrlParseStatus {
         Host,
         Port,
         Resource,
     }
 
+    let url = url.as_ref();
     let (url, https) = if let Some(after_protocol) = url.strip_prefix("http://") {
         (after_protocol, false)
     } else if let Some(after_protocol) = url.strip_prefix("https://") {
