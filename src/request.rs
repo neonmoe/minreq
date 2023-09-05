@@ -357,6 +357,15 @@ impl ParsedRequest {
     fn get_http_head(&self) -> String {
         let mut http = String::with_capacity(32);
 
+        // NOTE: As of 2.10.0, the fragment is intentionally left out of the request, based on:
+        // - [RFC 3986 section 3.5](https://datatracker.ietf.org/doc/html/rfc3986#section-3.5):
+        //   "...the fragment identifier is not used in the scheme-specific
+        //   processing of a URI; instead, the fragment identifier is separated
+        //   from the rest of the URI prior to a dereference..."
+        // - [RFC 7231 section 9.5](https://datatracker.ietf.org/doc/html/rfc7231#section-9.5):
+        //   "Although fragment identifiers used within URI references are not
+        //   sent in requests..."
+
         // Add the request line and the "Host" header
         write!(
             http,

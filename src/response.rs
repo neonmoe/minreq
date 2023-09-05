@@ -29,7 +29,8 @@ pub struct Response {
     pub headers: HashMap<String, String>,
     /// The URL of the resource returned in this response. May differ from the
     /// request URL if it was redirected or typo corrections were applied (e.g.
-    /// http://example.com?foo=bar).
+    /// <http://example.com?foo=bar> would be corrected to
+    /// <http://example.com/?foo=bar>).
     pub url: String,
 
     body: Vec<u8>,
@@ -221,7 +222,8 @@ pub struct ResponseLazy {
     pub headers: HashMap<String, String>,
     /// The URL of the resource returned in this response. May differ from the
     /// request URL if it was redirected or typo corrections were applied (e.g.
-    /// http://example.com?foo=bar).
+    /// <http://example.com?foo=bar> would be corrected to
+    /// <http://example.com/?foo=bar>).
     pub url: String,
 
     stream: HttpStreamBytes,

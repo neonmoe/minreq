@@ -5,6 +5,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed
+- Fragment handling, once again. Turns out you're not supposed to include
+  fragments in the request. This may break usage with servers that are written
+  with the wrong assumptions. Thanks for the report, @rawhuul!
+  ([#100](https://github.com/neonmoe/minreq/issues/100))
+
+### Added
+- `Response::url` and `ResponseLazy::url` fields, to contain the final URL after
+  redirects and fragment replacement semantics.
 
 ## [2.9.1] - 2023-08-28
 ### Changed
