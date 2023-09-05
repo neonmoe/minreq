@@ -222,12 +222,12 @@ impl Connection {
                 Ok(tls) => tls,
                 Err(err) => return Err(Error::IoError(io::Error::new(io::ErrorKind::Other, err))),
             };
-            log::trace!("Writing HTTPS request to {}.", self.request.host);
+            log::trace!("Writing HTTPS request to {}.", self.request.url.host);
             let _ = tls.get_ref().set_write_timeout(self.timeout()?);
             tls.write_all(&bytes)?;
 
             // Receive request
-            log::trace!("Reading HTTPS response from {}.", self.request.host);
+            log::trace!("Reading HTTPS response from {}.", self.request.url.host);
             let response = ResponseLazy::from_stream(
                 HttpStream::create_secured(tls, self.timeout_at),
                 self.request.config.max_headers_size,
