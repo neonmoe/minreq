@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [2.10.0] - 2023-09-05
 ### Fixed
 - Fragment handling, once again. Turns out you're not supposed to include
   fragments in the request. This may break usage with servers that are written
