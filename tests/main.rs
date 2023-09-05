@@ -105,15 +105,19 @@ fn test_redirect_post() {
 #[test]
 fn test_redirect_with_fragment() {
     setup();
-    let body = get_body(minreq::get(url("/redirect#foo")).with_body("Q").send());
-    assert_eq!(body, "j: Qfoo");
+    let original_url = url("/redirect#foo");
+    let res = minreq::get(original_url).send().unwrap();
+    // Fragment should stay the same, otherwise redirected
+    assert_eq!(res.url.as_str(), url("/a#foo"));
 }
 
 #[test]
 fn test_redirect_with_overridden_fragment() {
     setup();
-    let body = get_body(minreq::get(url("/redirect-baz#foo")).with_body("Q").send());
-    assert_eq!(body, "j: Qbaz");
+    let original_url = url("/redirect-baz#foo");
+    let res = minreq::get(original_url).send().unwrap();
+    // This redirect should provide its own fragment, overriding the initial one
+    assert_eq!(res.url.as_str(), url("/a#baz"));
 }
 
 #[test]

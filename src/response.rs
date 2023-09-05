@@ -27,6 +27,10 @@ pub struct Response {
     /// The headers of the response. The header field names (the
     /// keys) are all lowercase.
     pub headers: HashMap<String, String>,
+    /// The URL of the resource returned in this response. May differ from the
+    /// request URL if it was redirected or typo corrections were applied (e.g.
+    /// http://example.com?foo=bar).
+    pub url: String,
 
     body: Vec<u8>,
 }
@@ -54,6 +58,7 @@ impl Response {
             status_code,
             reason_phrase,
             headers,
+            url,
             ..
         } = parent;
 
@@ -61,6 +66,7 @@ impl Response {
             status_code,
             reason_phrase,
             headers,
+            url,
             body,
         })
     }
@@ -213,6 +219,10 @@ pub struct ResponseLazy {
     /// The headers of the response. The header field names (the
     /// keys) are all lowercase.
     pub headers: HashMap<String, String>,
+    /// The URL of the resource returned in this response. May differ from the
+    /// request URL if it was redirected or typo corrections were applied (e.g.
+    /// http://example.com?foo=bar).
+    pub url: String,
 
     stream: HttpStreamBytes,
     state: HttpStreamState,
@@ -240,6 +250,7 @@ impl ResponseLazy {
             status_code,
             reason_phrase,
             headers,
+            url: String::new(),
             stream,
             state,
             max_trailing_headers_size,

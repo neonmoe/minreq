@@ -25,7 +25,6 @@ pub fn setup() {
                 let mut content = String::new();
                 request.as_reader().read_to_string(&mut content).ok();
                 let headers = Vec::from(request.headers());
-                let fragment = request.url().split('#').nth(1).unwrap_or("");
 
                 let url = String::from(request.url().split('#').next().unwrap());
                 match request.method() {
@@ -47,7 +46,7 @@ pub fn setup() {
                     }
 
                     Method::Get if url == "/a" => {
-                        let response = Response::from_string(format!("j: {}{}", content, fragment));
+                        let response = Response::from_string(format!("j: {}", content));
                         request.respond(response).ok();
                     }
                     Method::Post if url == "/a" => {

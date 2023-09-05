@@ -20,5 +20,4 @@ jobs:
       - name: Running test script
         run: |
           cargo test
-          cargo test --features json-using-serde
-          cargo test --features proxy
+          cargo test --features "json-using-serde proxy punycode"

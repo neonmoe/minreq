@@ -99,8 +99,8 @@ impl Proxy {
         } else {
             String::new()
         };
-        let host = &proxied_req.host;
-        let port = proxied_req.port.port();
+        let host = &proxied_req.url.host;
+        let port = proxied_req.url.port.port();
         format!(
             "CONNECT {}:{} HTTP/1.1\r\n{}\r\n",
             host, port, authorization

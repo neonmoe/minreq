@@ -250,6 +250,7 @@ extern crate serde_json;
 
 mod connection;
 mod error;
+mod http_url;
 #[cfg(feature = "proxy")]
 mod proxy;
 mod request;
