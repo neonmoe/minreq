@@ -6,6 +6,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.11.0] - 2023-10-17
+### Changed
+- Removed upper bounds on the `serde_json`, `log` and `chrono`
+  dependencies (dev-dependency in the case of `chrono`). If you were
+  depending on minreq compiling with the MSRV compiler without any
+  issues, check out the MSRV section in the readme, it's been updated
+  with additional instructions. Thanks for the report, @RCasatta!
+  ([#99](https://github.com/neonmoe/minreq/issues/99))
+
 ## [2.10.0] - 2023-09-05
 ### Fixed
 - Fragment handling, once again. Turns out you're not supposed to include
