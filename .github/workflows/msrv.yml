@@ -19,5 +19,8 @@ jobs:
         uses: dtolnay/rust-toolchain@1.48
       - name: Running test script
         run: |
+          cargo update -p serde_json --precise=1.0.100
+          cargo update -p log --precise=0.4.18
+          cargo update -p chrono --precise=0.4.23
           cargo test
           cargo test --features "json-using-serde proxy punycode"

@@ -47,12 +47,31 @@ major version bump.
 
 ## Minimum Supported Rust Version (MSRV)
 
+If you don't care about the MSRV, you can ignore this section
+entirely, including the commands instructed.
+
 We use an MSRV per major release, i.e., with a new major release we
 reserve the right to change the MSRV.
 
 The current major version (v2) of this library should always compile with any
 combination of features excluding the TLS and urlencoding features on **Rust
 1.48**. This is because those dependencies themselves have a higher MSRV.
+
+That said, the crate does still require forcing some dependencies to
+lower-than-latest versions to actually compile with the older
+compiler, as these dependencies have upped their MSRV in a patch
+version. This can be achieved with the following (these just update
+your Cargo.lock):
+
+```sh
+cargo update --package=log --precise=0.4.18
+
+# only required if you're using the `json-using-serde` feature:
+cargo update --package=serde_json --precise=1.0.100
+
+# only required if you're testing minreq, as this is a dependency of the dev-dependency `tiny_http`:
+cargo update --package=chrono --precise=0.4.23
+```
 
 ## License
 This crate is distributed under the terms of the [ISC license](COPYING.md).
