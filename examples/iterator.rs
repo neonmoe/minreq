@@ -5,18 +5,8 @@ fn main() -> Result<(), minreq::Error> {
     let mut buffer = Vec::new();
     for byte in minreq::get("http://example.com").send_lazy()? {
         // The connection could have a problem at any point during the
-        // download, so each byte needs to be unwrapped. An IO error
-        // of the WouldBlock kind may also be returned, but it is not
-        // a fatal error, it just means that we're still waiting for
-        // more bytes. Some operating systems just block while waiting
-        // for more bytes, others return a WouldBlock error.
-        let (byte, len) = match byte {
-            Ok((byte, len)) => (byte, len),
-            Err(minreq::Error::IoError(err)) if err.kind() == std::io::ErrorKind::WouldBlock => {
-                continue
-            }
-            Err(err) => return Err(err),
-        };
+        // download, so each byte needs to be unwrapped.
+        let (byte, len) = byte?;
 
         // The `byte` is the current u8 of data we're iterating
         // through.
