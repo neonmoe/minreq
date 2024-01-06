@@ -14,7 +14,7 @@ use rustls::{
 #[cfg(feature = "rustls")]
 use std::convert::TryFrom;
 use std::env;
-use std::io::{self, BufReader, BufWriter, Read, Write};
+use std::io::{self, Read, Write};
 use std::net::{TcpStream, ToSocketAddrs};
 #[cfg(feature = "rustls")]
 use std::sync::Arc;
@@ -51,7 +51,7 @@ static CONFIG: Lazy<Arc<ClientConfig>> = Lazy::new(|| {
     Arc::new(config)
 });
 
-type UnsecuredStream = BufReader<TcpStream>;
+type UnsecuredStream = TcpStream;
 #[cfg(feature = "rustls")]
 type SecuredStream = StreamOwned<ClientConnection, TcpStream>;
 #[cfg(all(
@@ -105,7 +105,7 @@ impl Read for HttpStream {
 
         match self {
             HttpStream::Unsecured(inner, timeout_at) => {
-                timeout(inner.get_ref(), *timeout_at)?;
+                timeout(inner, *timeout_at)?;
                 inner.read(buf)
             }
             #[cfg(any(feature = "rustls", feature = "openssl", feature = "native-tls"))]
@@ -245,25 +245,16 @@ impl Connection {
             let bytes = self.request.as_bytes();
 
             log::trace!("Establishing TCP connection to {}.", self.request.url.host);
-            let tcp = self.connect()?;
+            let mut tcp = self.connect()?;
 
             // Send request
             log::trace!("Writing HTTP request.");
-            let mut stream = BufWriter::new(tcp);
-            let _ = stream.get_ref().set_write_timeout(self.timeout()?);
-            stream.write_all(&bytes)?;
+            let _ = tcp.set_write_timeout(self.timeout()?);
+            tcp.write_all(&bytes)?;
 
             // Receive response
             log::trace!("Reading HTTP response.");
-            let tcp = match stream.into_inner() {
-                Ok(tcp) => tcp,
-                Err(_) => {
-                    return Err(Error::Other(
-                        "IntoInnerError after writing the request into the TcpStream.",
-                    ));
-                }
-            };
-            let stream = HttpStream::create_unsecured(BufReader::new(tcp), self.timeout_at);
+            let stream = HttpStream::create_unsecured(tcp, self.timeout_at);
             let response = ResponseLazy::from_stream(
                 stream,
                 self.request.config.max_headers_size,
