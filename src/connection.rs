@@ -103,7 +103,7 @@ impl Read for HttpStream {
             Ok(())
         };
 
-        match self {
+        let result = match self {
             HttpStream::Unsecured(inner, timeout_at) => {
                 timeout(inner, *timeout_at)?;
                 inner.read(buf)
@@ -113,6 +113,13 @@ impl Read for HttpStream {
                 timeout(inner.get_ref(), *timeout_at)?;
                 inner.read(buf)
             }
+        };
+        match result {
+            Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
+                // We're a blocking socket, so EWOULDBLOCK indicates a timeout
+                Err(timeout_err())
+            }
+            r => r,
         }
     }
 }
