@@ -1,10 +1,7 @@
 use crate::{connection::HttpStream, Error};
 use std::collections::HashMap;
-use std::io::{self, BufReader, Bytes, Read};
+use std::io::{self, BufReader, Read};
 use std::str;
-
-const BACKING_READ_BUFFER_LENGTH: usize = 16 * 1024;
-const MAX_CONTENT_LENGTH: usize = 16 * 1024;
 
 /// An HTTP response.
 ///
@@ -40,11 +37,7 @@ impl Response {
     pub(crate) fn create(mut parent: ResponseLazy, is_head: bool) -> Result<Response, Error> {
         let mut body = Vec::new();
         if !is_head && parent.status_code != 204 && parent.status_code != 304 {
-            for byte in &mut parent {
-                let (byte, length) = byte?;
-                body.reserve(length);
-                body.push(byte);
-            }
+            parent.read_to_end(&mut body)?;
         }
 
         let ResponseLazy {
@@ -168,38 +161,23 @@ impl Response {
     }
 }
 
-/// An HTTP response, which is loaded lazily.
+/// An HTTP response, which streams bytes as they arrive on the
+/// underlying TCP stream via [`std::io::Read`]
 ///
 /// In comparison to [`Response`](struct.Response.html), this is
 /// returned from
 /// [`send_lazy()`](struct.Request.html#method.send_lazy), where as
 /// [`Response`](struct.Response.html) is returned from
 /// [`send()`](struct.Request.html#method.send).
-///
-/// In practice, "lazy loading" means that the bytes are only loaded
-/// as you iterate through them. The bytes are provided in the form of
-/// a `Result<(u8, usize), minreq::Error>`, as the reading operation
-/// can fail in various ways. The `u8` is the actual byte that was
-/// read, and `usize` is how many bytes we are expecting to read in
-/// the future (including this byte). Note, however, that the `usize`
-/// can change, particularly when the `Transfer-Encoding` is
-/// `chunked`: then it will reflect how many bytes are left of the
-/// current chunk. The expected size is capped at 16 KiB to avoid
-/// server-side DoS attacks targeted at clients accidentally reserving
-/// too much memory.
-///
 /// # Example
 /// ```no_run
 /// // This is how the normal Response works behind the scenes, and
 /// // how you might use ResponseLazy.
 /// # fn main() -> Result<(), minreq::Error> {
-/// let response = minreq::get("http://example.com").send_lazy()?;
+/// use std::io::Read;
+/// let mut response = minreq::get("http://example.com").send_lazy()?;
 /// let mut vec = Vec::new();
-/// for result in response {
-///     let (byte, length) = result?;
-///     vec.reserve(length);
-///     vec.push(byte);
-/// }
+/// response.read_to_end(&mut vec)?;
 /// # Ok(())
 /// # }
 ///
@@ -218,12 +196,10 @@ pub struct ResponseLazy {
     /// <http://example.com/?foo=bar>).
     pub url: String,
 
-    stream: HttpStreamBytes,
+    stream: BufReader<HttpStream>,
     state: HttpStreamState,
     max_trailing_headers_size: Option<usize>,
 }
-
-type HttpStreamBytes = Bytes<BufReader<HttpStream>>;
 
 impl ResponseLazy {
     pub(crate) fn from_stream(
@@ -231,7 +207,7 @@ impl ResponseLazy {
         max_headers_size: Option<usize>,
         max_status_line_len: Option<usize>,
     ) -> Result<ResponseLazy, Error> {
-        let mut stream = BufReader::with_capacity(BACKING_READ_BUFFER_LENGTH, stream).bytes();
+        let mut stream = BufReader::new(stream);
         let ResponseMetadata {
             status_code,
             reason_phrase,
@@ -252,89 +228,44 @@ impl ResponseLazy {
     }
 }
 
-impl Iterator for ResponseLazy {
-    type Item = Result<(u8, usize), Error>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        use HttpStreamState::*;
-        match self.state {
-            EndOnClose => read_until_closed(&mut self.stream),
-            ContentLength(ref mut length) => read_with_content_length(&mut self.stream, length),
-            Chunked(ref mut expecting_chunks, ref mut length, ref mut content_length) => {
-                read_chunked(
-                    &mut self.stream,
-                    &mut self.headers,
-                    expecting_chunks,
-                    length,
-                    content_length,
-                    self.max_trailing_headers_size,
-                )
-            }
-        }
-    }
-}
-
 impl Read for ResponseLazy {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        let mut index = 0;
-        for res in self {
-            // there is no use for the estimated length in the read implementation
-            // so it is ignored.
-            let (byte, _) = res.map_err(|e| match e {
-                Error::IoError(e) => e,
-                _ => io::Error::new(io::ErrorKind::Other, e),
-            })?;
+        use HttpStreamState::*;
+        match &mut self.state {
+            // If we're reading until the TCP stream closes,
+            // just... read it!
+            EndOnClose => self.stream.read(buf),
+            // If we have a content length, read up to the remaining number
+            // of bytes, or the buffer size, whichever is smaller.
+            ContentLength { to_go } => {
+                if *to_go == 0 {
+                    return Ok(0);
+                }
 
-            buf[index] = byte;
-            index += 1;
-
-            // if the buffer is full, it should stop reading
-            if index >= buf.len() {
-                break;
+                let to_read = buf.len().min(*to_go);
+                let n = self.stream.read(&mut buf[..to_read])?;
+                *to_go -= n;
+                Ok(n)
             }
-        }
-
-        // index of the next byte is the number of bytes thats have been read
-        Ok(index)
-    }
-}
-
-fn read_until_closed(bytes: &mut HttpStreamBytes) -> Option<<ResponseLazy as Iterator>::Item> {
-    if let Some(byte) = bytes.next() {
-        match byte {
-            Ok(byte) => Some(Ok((byte, 1))),
-            Err(err) => Some(Err(Error::IoError(err))),
-        }
-    } else {
-        None
-    }
-}
-
-fn read_with_content_length(
-    bytes: &mut HttpStreamBytes,
-    content_length: &mut usize,
-) -> Option<<ResponseLazy as Iterator>::Item> {
-    if *content_length > 0 {
-        *content_length -= 1;
-
-        if let Some(byte) = bytes.next() {
-            match byte {
-                // Cap Content-Length to 16KiB, to avoid out-of-memory issues.
-                Ok(byte) => return Some(Ok((byte, (*content_length).min(MAX_CONTENT_LENGTH) + 1))),
-                Err(err) => return Some(Err(Error::IoError(err))),
-            }
+            Chunked { more_chunks, to_go } => read_chunked(
+                buf,
+                &mut self.stream,
+                &mut self.headers,
+                self.max_trailing_headers_size,
+                more_chunks,
+                to_go,
+            ),
         }
     }
-    None
 }
 
 fn read_trailers(
-    bytes: &mut HttpStreamBytes,
+    stream: &mut BufReader<HttpStream>,
     headers: &mut HashMap<String, String>,
     mut max_headers_size: Option<usize>,
 ) -> Result<(), Error> {
     loop {
-        let trailer_line = read_line(bytes, max_headers_size, Error::HeadersOverflow)?;
+        let trailer_line = read_line(stream, max_headers_size, Error::HeadersOverflow)?;
         if let Some(ref mut max_headers_size) = max_headers_size {
             *max_headers_size -= trailer_line.len() + 2;
         }
@@ -348,26 +279,34 @@ fn read_trailers(
 }
 
 fn read_chunked(
-    bytes: &mut HttpStreamBytes,
+    buf: &mut [u8],
+    stream: &mut BufReader<HttpStream>,
     headers: &mut HashMap<String, String>,
-    expecting_more_chunks: &mut bool,
-    chunk_length: &mut usize,
-    content_length: &mut usize,
     max_trailing_headers_size: Option<usize>,
-) -> Option<<ResponseLazy as Iterator>::Item> {
-    if !*expecting_more_chunks && *chunk_length == 0 {
-        return None;
+    more_chunks: &mut bool,
+    to_go: &mut usize, // In the current chunk
+) -> std::io::Result<usize> {
+    if !*more_chunks && *to_go == 0 {
+        return Ok(0);
     }
 
-    if *chunk_length == 0 {
+    // Save some typing:
+    fn bail<E: Into<Box<dyn std::error::Error + Send + Sync>>>(e: E) -> std::io::Result<usize> {
+        Err(io::Error::new(io::ErrorKind::Other, e))
+    }
+
+    // If we have no bytes left to read in the current chunk,
+    // but we're still expecting more chunks,
+    // read the length of the next one.
+    if *to_go == 0 {
         // Max length of the chunk length line is 1KB: not too long to
         // take up much memory, long enough to tolerate some chunk
         // extensions (which are ignored).
 
         // Get the size of the next chunk
-        let length_line = match read_line(bytes, Some(1024), Error::MalformedChunkLength) {
+        let length_line = match read_line(stream, Some(1024), Error::MalformedChunkLength) {
             Ok(line) => line,
-            Err(err) => return Some(Err(err)),
+            Err(e) => return bail(e),
         };
 
         // Note: the trim() and check for empty lines shouldn't be
@@ -383,50 +322,42 @@ fn read_chunked(
             };
             match usize::from_str_radix(length, 16) {
                 Ok(length) => length,
-                Err(_) => return Some(Err(Error::MalformedChunkLength)),
+                Err(e) => return bail(e),
             }
         };
 
+        // If the incoming length is 0, we're done. There's no more chunks.
+        // Read the trailers and get out.
         if incoming_length == 0 {
-            if let Err(err) = read_trailers(bytes, headers, max_trailing_headers_size) {
-                return Some(Err(err));
-            }
+            *more_chunks = false;
 
-            *expecting_more_chunks = false;
-            headers.insert("content-length".to_string(), (*content_length).to_string());
-            headers.remove("transfer-encoding");
-            return None;
+            if let Err(err) = read_trailers(stream, headers, max_trailing_headers_size) {
+                return bail(err);
+            }
+            return Ok(0);
         }
-        *chunk_length = incoming_length;
-        *content_length += incoming_length;
+        *to_go = incoming_length;
     }
 
-    if *chunk_length > 0 {
-        *chunk_length -= 1;
-        if let Some(byte) = bytes.next() {
-            match byte {
-                Ok(byte) => {
-                    // If we're at the end of the chunk...
-                    if *chunk_length == 0 {
-                        //...read the trailing \r\n of the chunk, and
-                        // possibly return an error instead.
+    assert!(*to_go > 0); // If we got here, there's still bytes to read!
 
-                        // TODO: Maybe this could be written in a way
-                        // that doesn't discard the last ok byte if
-                        // the \r\n reading fails?
-                        if let Err(err) = read_line(bytes, Some(2), Error::MalformedChunkEnd) {
-                            return Some(Err(err));
-                        }
-                    }
+    let to_read = buf.len().min(*to_go);
+    let bytes_read = stream.read(&mut buf[..to_read])?;
+    *to_go -= bytes_read;
 
-                    return Some(Ok((byte, (*chunk_length).min(MAX_CONTENT_LENGTH) + 1)));
-                }
-                Err(err) => return Some(Err(Error::IoError(err))),
-            }
+    // If we're at the end of the chunk...
+    if *to_go == 0 {
+        //...read the trailing \r\n of the chunk, and
+        // possibly return an error instead.
+
+        // TODO: Maybe this could be written in a way
+        // that doesn't discard the last ok buffer if
+        // the \r\n reading fails?
+        if let Err(err) = read_line(stream, Some(2), Error::MalformedChunkEnd) {
+            return bail(err);
         }
     }
-
-    None
+    Ok(bytes_read)
 }
 
 enum HttpStreamState {
@@ -434,14 +365,12 @@ enum HttpStreamState {
     // read unti lthe server closes the connection (this should be the
     // fallback, if I read the rfc right).
     EndOnClose,
-    // Content-Length was specified, read that amount of bytes
-    ContentLength(usize),
+    // Content-Length was specified, store the number of bytes remaining
+    ContentLength { to_go: usize },
     // Transfer-Encoding == chunked, so we need to save two pieces of
-    // information: are we expecting more chunks, how much is there
-    // left of the current chunk, and how much have we read? The last
-    // number is needed in order to provide an accurate Content-Length
-    // header after loading all the bytes.
-    Chunked(bool, usize, usize),
+    // information: are we expecting more chunks, and how much is there
+    // left of the current chunk?
+    Chunked { more_chunks: bool, to_go: usize },
 }
 
 // This struct is just used in the Response and ResponseLazy
@@ -457,7 +386,7 @@ struct ResponseMetadata {
 }
 
 fn read_metadata(
-    stream: &mut HttpStreamBytes,
+    stream: &mut BufReader<HttpStream>,
     mut max_headers_size: Option<usize>,
     max_status_line_len: Option<usize>,
 ) -> Result<ResponseMetadata, Error> {
@@ -499,9 +428,12 @@ fn read_metadata(
     }
 
     let state = if chunked {
-        HttpStreamState::Chunked(true, 0, 0)
+        HttpStreamState::Chunked {
+            more_chunks: true,
+            to_go: 0,
+        }
     } else if let Some(length) = content_length {
-        HttpStreamState::ContentLength(length)
+        HttpStreamState::ContentLength { to_go: length }
     } else {
         HttpStreamState::EndOnClose
     };
@@ -516,12 +448,12 @@ fn read_metadata(
 }
 
 fn read_line(
-    stream: &mut HttpStreamBytes,
+    stream: &mut BufReader<HttpStream>,
     max_len: Option<usize>,
     overflow_error: Error,
 ) -> Result<String, Error> {
     let mut bytes = Vec::with_capacity(32);
-    for byte in stream {
+    for byte in stream.bytes() {
         match byte {
             Ok(byte) => {
                 if let Some(max_len) = max_len {

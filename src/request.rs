@@ -240,7 +240,11 @@ impl Request {
         self
     }
 
-    /// Sends this request to the host.
+    /// Sends this request to the host and collect the *whole* response
+    ///
+    /// **WARNING:** This does what it says on the tin — so long as the
+    /// server keeps sending bytes, they will be appended, in-memory,
+    /// to the repsonse. Consider reading from a [`ResponseLazy`] instead.
     ///
     /// # Errors
     ///
