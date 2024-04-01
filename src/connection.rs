@@ -274,14 +274,23 @@ impl Connection {
     fn connect(&self) -> Result<TcpStream, Error> {
         let tcp_connect = |host: &str, port: u32| -> Result<TcpStream, Error> {
             let host = format!("{}:{}", host, port);
-            let mut addrs = host.to_socket_addrs().map_err(Error::IoError)?;
-            let sock_address = addrs.next().ok_or(Error::AddressNotFound)?;
-            let stream = if let Some(timeout) = self.timeout()? {
-                TcpStream::connect_timeout(&sock_address, timeout)
-            } else {
-                TcpStream::connect(sock_address)
-            };
-            stream.map_err(Error::from)
+            let addrs = host.to_socket_addrs().map_err(Error::IoError)?;
+            let addrs_count = addrs.len();
+
+            // Try all resolved addresses. Return the first one to which we could connect. If all
+            // failed return the last error encountered.
+            for (i, addr) in addrs.enumerate() {
+                let stream = if let Some(timeout) = self.timeout()? {
+                    TcpStream::connect_timeout(&addr, timeout)
+                } else {
+                    TcpStream::connect(addr)
+                };
+                if stream.is_ok() || i == addrs_count - 1 {
+                    return stream.map_err(Error::from);
+                }
+            }
+
+            Err(Error::AddressNotFound)
         };
 
         #[cfg(feature = "proxy")]
