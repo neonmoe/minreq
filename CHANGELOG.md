@@ -6,6 +6,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.11.1] - 2024-02-04
+### Fixed
+- Unnecessary buffering causing performance problems. Thanks for the
+  PRs, @mrkline! ([#102](https://github.com/neonmoe/minreq/pull/102),
+  [#103](https://github.com/neonmoe/minreq/pull/103))
+- Connections failing if the first resolved address fails to connect
+  (even if there's more to try). Thanks for the PR, @darosior!
+  ([#106](https://github.com/neonmoe/minreq/pull/106))
+
 ## [2.11.0] - 2023-10-17
 ### Changed
 - Removed upper bounds on the `serde_json`, `log` and `chrono`
