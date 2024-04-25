@@ -38,7 +38,7 @@ openssl-probe = { version = "0.1", optional = true }
 native-tls = { version = "0.2", optional = true }
 
 [dev-dependencies]
-tiny_http = "0.8.2"
+tiny_http = "0.12"
 chrono = "0.4.0"
 
 [package.metadata.docs.rs]
