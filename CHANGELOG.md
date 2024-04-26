@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.11.2] - 2024-04-26
+### Fixed
+- The dev dependency tiny_http's version up to 0.12. Thanks for the
+  PR, @davide125! ([#107](https://github.com/neonmoe/minreq/pull/107))
+
 ## [2.11.1] - 2024-02-04
 ### Fixed
 - Unnecessary buffering causing performance problems. Thanks for the
