@@ -65,12 +65,11 @@ your Cargo.lock):
 
 ```sh
 cargo update --package=log --precise=0.4.18
-
-# only required if you're using the `json-using-serde` feature:
+cargo update --package=httpdate --precise=1.0.2
 cargo update --package=serde_json --precise=1.0.100
-
-# only required if you're testing minreq, as this is a dependency of the dev-dependency `tiny_http`:
 cargo update --package=chrono --precise=0.4.23
+# This again, for some reason.
+cargo update --package=httpdate --precise=1.0.2
 ```
 
 ## License
