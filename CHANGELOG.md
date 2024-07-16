@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.12.0] - 2024-04-26
+### Added
+- Request::with_headers, to allow passing in many headers at a
+  time. Thanks for the idea and PR, @rawhuul!
+  ([#110](https://github.com/neonmoe/minreq/pull/110))
+
 ## [2.11.2] - 2024-04-26
 ### Fixed
 - The dev dependency tiny_http's version up to 0.12. Thanks for the
