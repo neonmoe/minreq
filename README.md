@@ -68,6 +68,7 @@ cargo update --package=log --precise=0.4.18
 cargo update --package=httpdate --precise=1.0.2
 cargo update --package=serde_json --precise=1.0.100
 cargo update --package=chrono --precise=0.4.23
+cargo update --package=num-traits --precise=0.2.18
 # This again, for some reason.
 cargo update --package=httpdate --precise=1.0.2
 ```

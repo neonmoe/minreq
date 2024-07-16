@@ -5,6 +5,8 @@ on:
     branches: [ master ]
   pull_request:
     branches: [ master ]
+  schedule:
+    - cron: "47 5 * * 6"
 
 env:
   CARGO_TERM_COLOR: always
@@ -23,6 +25,7 @@ jobs:
           cargo update -p httpdate --precise=1.0.2
           cargo update -p serde_json --precise=1.0.100
           cargo update -p chrono --precise=0.4.23
+          cargo update -p num-traits --precise=0.2.18
           cargo update -p httpdate --precise=1.0.2
           cargo test
           cargo test --features "json-using-serde proxy punycode"
