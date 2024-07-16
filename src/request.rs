@@ -534,10 +534,9 @@ mod parsing_tests {
 
     #[test]
     fn test_headers() {
-        let headers = HashMap::from([
-            ("foo".to_string(), "bar".to_string()),
-            ("foo".to_string(), "baz".to_string()),
-        ]);
+        let mut headers = HashMap::new();
+        headers.insert("foo".to_string(), "bar".to_string());
+        headers.insert("foo".to_string(), "baz".to_string());
 
         let req = get("http://www.example.org/test/res").with_headers(headers.clone());
 
