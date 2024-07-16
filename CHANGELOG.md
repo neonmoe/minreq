@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2.12.0] - 2024-04-26
+## [2.12.0] - 2024-07-16
 ### Added
 - Request::with_headers, to allow passing in many headers at a
   time. Thanks for the idea and PR, @rawhuul!
