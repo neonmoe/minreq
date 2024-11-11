@@ -273,8 +273,9 @@ impl Connection {
 
     fn connect(&self) -> Result<TcpStream, Error> {
         let tcp_connect = |host: &str, port: u32| -> Result<TcpStream, Error> {
-            let host = format!("{}:{}", host, port);
-            let addrs = host.to_socket_addrs().map_err(Error::IoError)?;
+            let addrs = (host, port as u16)
+                .to_socket_addrs()
+                .map_err(Error::IoError)?;
             let addrs_count = addrs.len();
 
             // Try all resolved addresses. Return the first one to which we could connect. If all
