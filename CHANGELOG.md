@@ -6,6 +6,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.13.0] - 2024-12-04
+### Changed
+- The `https-rustls-probe` feature no longer brings in the `webpki-roots` and
+  `rustls-webpki` crates. Thanks for the report, @polarathene!
+  ([#111](https://github.com/neonmoe/minreq/issues/111))
+
+### Fixed
+- Cleaned up an unnecessary `format!()` in `Connection::connect`. Thanks for the
+  PR, @melotic! ([#112](https://github.com/neonmoe/minreq/pull/112))
+- Fixed some msrv and lint issues introduced by libc and clippy updates
+  respectively.
+
 ## [2.12.0] - 2024-07-16
 ### Added
 - Request::with_headers, to allow passing in many headers at a
