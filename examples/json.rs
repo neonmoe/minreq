@@ -1,4 +1,4 @@
-/// This example demonstrates the `json-using-serde` feature.
+//! This example demonstrates the `json-using-serde` feature.
 
 fn main() -> Result<(), minreq::Error> {
     let response = minreq::get("http://httpbin.org/anything")

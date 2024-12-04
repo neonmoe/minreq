@@ -1,5 +1,5 @@
-/// This example demonstrates probably the most complicated part of
-/// `minreq`. Useful when making loading bars, for example.
+//! This example demonstrates probably the most complicated part of
+//! `minreq`. Useful when making loading bars, for example.
 
 fn main() -> Result<(), minreq::Error> {
     let mut buffer = Vec::new();
