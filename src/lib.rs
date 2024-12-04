@@ -238,9 +238,9 @@ extern crate log;
 extern crate native_tls;
 #[cfg(feature = "openssl-probe")]
 extern crate openssl_probe;
-#[cfg(feature = "rustls")]
+#[cfg(feature = "webpki-roots")]
 extern crate webpki;
-#[cfg(feature = "rustls")]
+#[cfg(feature = "webpki-roots")]
 extern crate webpki_roots;
 
 #[cfg(feature = "json-using-serde")]

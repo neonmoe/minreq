@@ -5,12 +5,10 @@
 use crate::native_tls::{TlsConnector, TlsStream};
 use crate::request::ParsedRequest;
 use crate::{Error, Method, ResponseLazy};
-#[cfg(feature = "https-rustls")]
+#[cfg(feature = "once_cell")]
 use once_cell::sync::Lazy;
 #[cfg(feature = "rustls")]
-use rustls::{
-    self, ClientConfig, ClientConnection, OwnedTrustAnchor, RootCertStore, ServerName, StreamOwned,
-};
+use rustls::{self, ClientConfig, ClientConnection, RootCertStore, ServerName, StreamOwned};
 #[cfg(feature = "rustls")]
 use std::convert::TryFrom;
 use std::env;
@@ -36,14 +34,16 @@ static CONFIG: Lazy<Arc<ClientConfig>> = Lazy::new(|| {
         }
     }
 
+    #[cfg(feature = "rustls-webpki")]
     #[allow(deprecated)] // Need to use add_server_trust_anchors to compile with rustls 0.21.1
     root_certificates.add_server_trust_anchors(TLS_SERVER_ROOTS.iter().map(|ta| {
-        OwnedTrustAnchor::from_subject_spki_name_constraints(
+        rustls::OwnedTrustAnchor::from_subject_spki_name_constraints(
             ta.subject,
             ta.spki,
             ta.name_constraints,
         )
     }));
+
     let config = ClientConfig::builder()
         .with_safe_defaults()
         .with_root_certificates(root_certificates)
