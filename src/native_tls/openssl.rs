@@ -20,6 +20,30 @@ use super::{Protocol, TlsAcceptorBuilder, TlsConnectorBuilder};
 */
 use openssl::pkey::Private;
 
+#[cfg(have_min_max_version)]
+fn supported_protocols(
+    min: Option<Protocol>,
+    max: Option<Protocol>,
+    ctx: &mut SslContextBuilder,
+) -> Result<(), ErrorStack> {
+    use openssl::ssl::SslVersion;
+    fn cvt(p: Protocol) -> SslVersion {
+        match p {
+            Protocol::Sslv3 => SslVersion::SSL3,
+            Protocol::Tlsv10 => SslVersion::TLS1,
+            Protocol::Tlsv11 => SslVersion::TLS1_1,
+            Protocol::Tlsv12 => SslVersion::TLS1_2,
+            Protocol::__NonExhaustive => unreachable!(),
+        }
+    }
+
+    ctx.set_min_proto_version(min.map(cvt))?;
+    ctx.set_max_proto_version(max.map(cvt))?;
+
+    Ok(())
+}
+
+#[cfg(not(have_min_max_version))]
 fn supported_protocols(
     min: Option<Protocol>,
     max: Option<Protocol>,
