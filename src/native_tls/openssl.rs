@@ -1,6 +1,3 @@
-#[cfg(feature = "openssl-probe")]
-use std::sync::Once;
-
 use openssl::error::ErrorStack;
 /*
 use ::openssl::hash::MessageDigest;
@@ -23,31 +20,6 @@ use super::{Protocol, TlsAcceptorBuilder, TlsConnectorBuilder};
 */
 use openssl::pkey::Private;
 
-#[cfg(have_min_max_version)]
-fn supported_protocols(
-    min: Option<Protocol>,
-    max: Option<Protocol>,
-    ctx: &mut SslContextBuilder,
-) -> Result<(), ErrorStack> {
-    use openssl::ssl::SslVersion;
-
-    fn cvt(p: Protocol) -> SslVersion {
-        match p {
-            Protocol::Sslv3 => SslVersion::SSL3,
-            Protocol::Tlsv10 => SslVersion::TLS1,
-            Protocol::Tlsv11 => SslVersion::TLS1_1,
-            Protocol::Tlsv12 => SslVersion::TLS1_2,
-            Protocol::__NonExhaustive => unreachable!(),
-        }
-    }
-
-    ctx.set_min_proto_version(min.map(cvt))?;
-    ctx.set_max_proto_version(max.map(cvt))?;
-
-    Ok(())
-}
-
-#[cfg(not(have_min_max_version))]
 fn supported_protocols(
     min: Option<Protocol>,
     max: Option<Protocol>,
@@ -91,12 +63,6 @@ fn supported_protocols(
     ctx.set_options(options);
 
     Ok(())
-}
-
-#[cfg(feature = "openssl-probe")]
-fn init_trust() {
-    static ONCE: Once = Once::new();
-    ONCE.call_once(openssl_probe::init_ssl_cert_env_vars);
 }
 
 #[cfg(target_os = "android")]
@@ -263,10 +229,15 @@ pub struct TlsConnector {
 
 impl TlsConnector {
     pub fn new(builder: &TlsConnectorBuilder) -> Result<TlsConnector, Error> {
-        #[cfg(feature = "openssl-probe")]
-        init_trust();
-
         let mut connector = SslConnector::builder(SslMethod::tls())?;
+
+        #[cfg(feature = "openssl-probe")]
+        {
+            let probe = openssl_probe::probe();
+            connector
+                .load_verify_locations(probe.cert_file.as_deref(), probe.cert_dir.as_deref())?;
+        }
+
         if let Some(ref identity) = builder.identity {
             connector.set_certificate(&identity.0.cert)?;
             connector.set_private_key(&identity.0.pkey)?;

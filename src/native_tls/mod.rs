@@ -1,6 +1,6 @@
 // Derived from https://lib.rs/crates/native-tls.
 
-#![allow(warnings)]
+#![allow(dead_code)]
 
 use std::any::Any;
 use std::error;
