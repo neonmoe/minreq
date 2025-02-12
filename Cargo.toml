@@ -44,7 +44,6 @@ chrono = "0.4.0"
 features = ["json-using-serde", "proxy", "https", "punycode"]
 
 [features]
-default = ["https", "rustls"]
 https = ["https-rustls"]
 https-rustls = ["rustls", "webpki-roots", "rustls-webpki"]
 https-rustls-probe = ["rustls", "rustls-native-certs"]
