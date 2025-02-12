@@ -29,7 +29,6 @@ base64 = { version = "0.12", optional = true }
 # For the https features:
 rustls = { version = "0.21.1", optional = true }
 rustls-native-certs = { version = "0.6.1", optional = true }
-once_cell = { version = "1.14.0", optional = true }
 webpki-roots = { version = "0.25.2", optional = true }
 rustls-webpki = { version = "0.101.0", optional = true }
 openssl = { version = "0.10.29", optional = true }
@@ -46,8 +45,8 @@ features = ["json-using-serde", "proxy", "https", "punycode"]
 
 [features]
 https = ["https-rustls"]
-https-rustls = ["rustls", "once_cell", "webpki-roots", "rustls-webpki"]
-https-rustls-probe = ["rustls", "once_cell", "rustls-native-certs"]
+https-rustls = ["rustls", "webpki-roots", "rustls-webpki"]
+https-rustls-probe = ["rustls", "rustls-native-certs"]
 https-bundled = ["openssl/vendored"]
 https-bundled-probe = ["https-bundled", "openssl-probe"]
 https-native = ["native-tls"]
