@@ -41,7 +41,7 @@ static CONFIG: std::sync::LazyLock<Arc<ClientConfig>> = std::sync::LazyLock::new
             ta.name_constraints,
         )
     }));
-    
+
     let config = ClientConfig::builder()
         .with_safe_defaults()
         .with_root_certificates(root_certificates)
