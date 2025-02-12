@@ -41,7 +41,7 @@ static CONFIG: std::sync::LazyLock<Arc<ClientConfig>> = std::sync::LazyLock::new
             ta.name_constraints,
         )
     }));
-
+    
     let config = ClientConfig::builder()
         .with_safe_defaults()
         .with_root_certificates(root_certificates)
@@ -183,7 +183,7 @@ impl Connection {
             log::trace!("Writing HTTPS request to {}.", self.request.url.host);
             let _ = tls.get_ref().set_write_timeout(self.timeout()?);
             tls.write_all(&bytes)?;
-            
+
             // Receive request
             log::trace!("Reading HTTPS response from {}.", self.request.url.host);
             let response = ResponseLazy::from_stream(
