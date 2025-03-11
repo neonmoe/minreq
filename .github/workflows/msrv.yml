@@ -26,6 +26,7 @@ jobs:
           cargo update -p serde_json --precise=1.0.100
           cargo update -p chrono --precise=0.4.23
           cargo update -p num-traits --precise=0.2.18
+          cargo update -p tempfile --precise=3.17.1
           cargo update -p libc --precise=0.2.163
           cargo update -p httpdate --precise=1.0.2
           cargo test
