@@ -71,6 +71,7 @@ cargo update --package=chrono --precise=0.4.23
 cargo update --package=num-traits --precise=0.2.18
 cargo update --package=tempfile --precise=3.17.1
 cargo update --package=libc --precise=0.2.163
+cargo update --package=iana-time-zone --precise=0.1.61
 # This again, for some reason.
 cargo update --package=httpdate --precise=1.0.2
 ```

@@ -21,13 +21,14 @@ jobs:
         uses: dtolnay/rust-toolchain@1.48
       - name: Running test script
         run: |
-          cargo update -p log --precise=0.4.18
-          cargo update -p httpdate --precise=1.0.2
-          cargo update -p serde_json --precise=1.0.100
-          cargo update -p chrono --precise=0.4.23
-          cargo update -p num-traits --precise=0.2.18
-          cargo update -p tempfile --precise=3.17.1
-          cargo update -p libc --precise=0.2.163
-          cargo update -p httpdate --precise=1.0.2
+          cargo update --package log --precise=0.4.18
+          cargo update --package httpdate --precise=1.0.2
+          cargo update --package serde_json --precise=1.0.100
+          cargo update --package chrono --precise=0.4.23
+          cargo update --package num-traits --precise=0.2.18
+          cargo update --package tempfile --precise=3.17.1
+          cargo update --package libc --precise=0.2.163
+          cargo update --package iana-time-zone --precise=0.1.61
+          cargo update --package httpdate --precise=1.0.2
           cargo test
           cargo test --features "json-using-serde proxy punycode"
