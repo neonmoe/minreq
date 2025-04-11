@@ -1,5 +1,7 @@
 use crate::error::Error;
 use crate::ParsedRequest;
+use base64::engine::general_purpose::STANDARD;
+use base64::engine::Engine;
 
 /// Kind of proxy connection (Basic, Digest, etc)
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -89,9 +91,9 @@ impl Proxy {
             match self.kind {
                 ProxyKind::Basic => {
                     let creds = if let Some(password) = &self.password {
-                        base64::encode(format!("{}:{}", user, password))
+                        STANDARD.encode(format!("{}:{}", user, password))
                     } else {
-                        base64::encode(user)
+                        STANDARD.encode(user)
                     };
                     format!("Proxy-Authorization: Basic {}\r\n", creds)
                 }
