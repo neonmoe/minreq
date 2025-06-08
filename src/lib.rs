@@ -239,7 +239,8 @@ mod native_tls;
 // the pruned version ends up having a lot of dead code. We still want it to be
 // compiled when using --all-features, so it's included here for that.
 #[allow(dead_code)]
-mod native_tls;
+#[path = "native_tls.rs"]
+mod unused_https_bundled_version_of_native_tls;
 
 #[cfg(feature = "json-using-serde")]
 extern crate serde;
