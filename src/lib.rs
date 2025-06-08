@@ -230,18 +230,6 @@
 // fixed before our MSRV gets that high.
 #![allow(clippy::io_other_error)]
 
-#[cfg(feature = "native-tls")]
-extern crate native_tls;
-#[cfg(all(feature = "openssl", not(feature = "native-tls")))]
-mod native_tls;
-#[cfg(all(feature = "openssl", feature = "native-tls"))]
-// If native-tls is enabled, it's preferred over our pruned version of it, so
-// the pruned version ends up having a lot of dead code. We still want it to be
-// compiled when using --all-features, so it's included here for that.
-#[allow(dead_code)]
-#[path = "native_tls.rs"]
-mod unused_https_bundled_version_of_native_tls;
-
 #[cfg(feature = "json-using-serde")]
 extern crate serde;
 #[cfg(feature = "json-using-serde")]

@@ -5,7 +5,7 @@ use self::setup::*;
 use std::io;
 
 #[test]
-#[cfg(any(feature = "rustls", feature = "openssl", feature = "native-tls"))]
+#[cfg(any(feature = "rustls", feature = "https-bundled", feature = "native-tls"))]
 fn test_https() {
     // TODO: Implement this locally.
     assert_eq!(
