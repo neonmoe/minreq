@@ -169,7 +169,7 @@ impl Connection {
             log::trace!("Setting up TLS parameters for {}.", self.request.url.host);
             let dns_name = match ServerName::try_from(&*self.request.url.host) {
                 Ok(result) => result,
-                Err(err) => return Err(Error::IoError(io::Error::other(err))),
+                Err(err) => return Err(Error::IoError(io::Error::new(io::ErrorKind::Other, err))),
             };
             let sess = ClientConnection::new(CONFIG.clone(), dns_name)
                 .map_err(Error::RustlsCreateConnection)?;

@@ -57,7 +57,8 @@ impl HttpUrl {
         } else {
             // TODO: Uncomment this for 3.0
             // return Err(Error::InvalidProtocol);
-            return Err(Error::IoError(std::io::Error::other(
+            return Err(Error::IoError(std::io::Error::new(
+                std::io::ErrorKind::Other,
                 "was redirected to an absolute url with an invalid protocol",
             )));
         };

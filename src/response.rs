@@ -282,7 +282,7 @@ impl Read for ResponseLazy {
             // so it is ignored.
             let (byte, _) = res.map_err(|e| match e {
                 Error::IoError(e) => e,
-                _ => io::Error::other(e),
+                _ => io::Error::new(io::ErrorKind::Other, e),
             })?;
 
             buf[index] = byte;
