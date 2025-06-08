@@ -208,11 +208,6 @@ impl Connection {
 
             log::trace!("Setting up TLS parameters for {}.", self.request.url.host);
             let dns_name = &self.request.url.host;
-            /*
-            let mut builder = TlsConnector::builder();
-            ...
-            let sess = match builder.build() {
-            */
             let sess = match TlsConnector::new() {
                 Ok(sess) => sess,
                 Err(err) => return Err(Error::IoError(io::Error::new(io::ErrorKind::Other, err))),
