@@ -226,6 +226,9 @@
 //! variable will be ignored.
 
 #![deny(missing_docs)]
+// std::io::Error::other was added in 1.74, so occurrences of this lint can't be
+// fixed before our MSRV gets that high.
+#![allow(clippy::io_other_error)]
 
 #[cfg(feature = "rustls")]
 extern crate rustls;
