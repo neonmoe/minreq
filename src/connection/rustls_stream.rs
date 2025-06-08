@@ -1,3 +1,6 @@
+//! TLS connection handling functionality when using the `rustls` crate for
+//! handling TLS.
+
 use rustls::{self, ClientConfig, ClientConnection, RootCertStore, ServerName, StreamOwned};
 use std::convert::TryFrom;
 use std::io::{self, Write};

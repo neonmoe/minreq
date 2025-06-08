@@ -1,3 +1,6 @@
+//! TLS connection handling functionality when using the `native-tls` crate for
+//! handling TLS.
+
 use native_tls::{TlsConnector, TlsStream};
 use std::io::{self, Write};
 use std::net::TcpStream;

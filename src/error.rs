@@ -3,6 +3,9 @@ use std::{error, fmt, io, str};
 /// Represents an error while sending, receiving, or parsing an HTTP response.
 #[derive(Debug)]
 // TODO: Make non-exhaustive for 3.0?
+// TODO: Maybe make a few inner error types containing groups of these, based on
+// what the user might want to handle? This error doesn't really invite graceful
+// handling.
 pub enum Error {
     #[cfg(feature = "json-using-serde")]
     /// Ran into a Serde error.
@@ -14,6 +17,7 @@ pub enum Error {
     #[cfg(feature = "rustls")]
     /// Ran into a rustls error while creating the connection.
     RustlsCreateConnection(rustls::Error),
+    // TODO: Add separate errors for openssl and native_tls errors as well
     /// Ran into an IO problem while loading the response.
     IoError(io::Error),
     /// Couldn't parse the incoming chunk's length while receiving a
