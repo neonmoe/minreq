@@ -56,17 +56,6 @@ impl From<imp::Error> for Error {
     }
 }
 
-/// A cryptographic identity.
-///
-/// An identity is an X509 certificate along with its corresponding private key and chain of certificates to a trusted
-/// root.
-#[derive(Clone)]
-pub struct Identity(imp::Identity);
-
-/// An X509 certificate.
-#[derive(Clone)]
-pub struct Certificate(imp::Certificate);
-
 /// An error returned from `ClientBuilder::handshake`.
 #[derive(Debug)]
 pub enum HandshakeError {
@@ -109,68 +98,15 @@ impl From<imp::HandshakeError> for HandshakeError {
     }
 }
 
-/// SSL/TLS protocol versions.
-#[derive(Debug, Copy, Clone)]
-pub enum Protocol {
-    /// The SSL 3.0 protocol.
-    ///
-    /// # Warning
-    ///
-    /// SSL 3.0 has severe security flaws, and should not be used unless absolutely necessary. If
-    /// you are not sure if you need to enable this protocol, you should not.
-    Sslv3,
-    /// The TLS 1.0 protocol.
-    Tlsv10,
-    /// The TLS 1.1 protocol.
-    Tlsv11,
-    /// The TLS 1.2 protocol.
-    Tlsv12,
-    #[doc(hidden)]
-    __NonExhaustive,
-}
-
-/// A builder for `TlsConnector`s.
-pub struct TlsConnectorBuilder {
-    identity: Option<Identity>,
-    min_protocol: Option<Protocol>,
-    max_protocol: Option<Protocol>,
-    root_certificates: Vec<Certificate>,
-    accept_invalid_certs: bool,
-    accept_invalid_hostnames: bool,
-    use_sni: bool,
-    disable_built_in_roots: bool,
-}
-
-impl TlsConnectorBuilder {
-    /// Creates a new `TlsConnector`.
-    pub fn build(&self) -> Result<TlsConnector> {
-        let connector = imp::TlsConnector::new(self)?;
-        Ok(TlsConnector(connector))
-    }
-}
-
 /// A builder for client-side TLS connections.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct TlsConnector(imp::TlsConnector);
 
 impl TlsConnector {
     /// Returns a new connector with default settings.
     pub fn new() -> Result<TlsConnector> {
-        TlsConnector::builder().build()
-    }
-
-    /// Returns a new builder for a `TlsConnector`.
-    pub fn builder() -> TlsConnectorBuilder {
-        TlsConnectorBuilder {
-            identity: None,
-            min_protocol: Some(Protocol::Tlsv10),
-            max_protocol: None,
-            root_certificates: vec![],
-            use_sni: true,
-            accept_invalid_certs: false,
-            accept_invalid_hostnames: false,
-            disable_built_in_roots: false,
-        }
+        let connector = imp::TlsConnector::new()?;
+        Ok(TlsConnector(connector))
     }
 
     /// Initiates a TLS handshake.
@@ -243,8 +179,6 @@ fn _check_kinds() {
     fn is_send<T: Send>() {}
     is_sync::<Error>();
     is_send::<Error>();
-    is_sync::<TlsConnectorBuilder>();
-    is_send::<TlsConnectorBuilder>();
     is_sync::<TlsConnector>();
     is_send::<TlsConnector>();
     is_sync::<TlsStream<TcpStream>>();
@@ -253,91 +187,16 @@ fn _check_kinds() {
 
 mod imp {
     use openssl::error::ErrorStack;
-    use openssl::pkey::PKey;
     use openssl::ssl::{
-        self, MidHandshakeSslStream, SslConnector, SslContextBuilder, SslMethod, SslVerifyMode,
+        self, MidHandshakeSslStream, SslConnector, SslContextBuilder, SslMethod, SslOptions,
+        SslStream,
     };
-    use openssl::x509::{store::X509StoreBuilder, X509VerifyResult, X509};
-    use std::error;
+    use openssl::x509::{X509VerifyResult, X509};
     use std::fmt;
     use std::io;
+    use std::{error, fs};
 
-    use super::{Protocol, TlsConnectorBuilder};
-    use openssl::pkey::Private;
-
-    #[cfg(have_min_max_version)]
-    fn supported_protocols(
-        min: Option<Protocol>,
-        max: Option<Protocol>,
-        ctx: &mut SslContextBuilder,
-    ) -> Result<(), ErrorStack> {
-        use openssl::ssl::SslVersion;
-        fn cvt(p: Protocol) -> SslVersion {
-            match p {
-                Protocol::Sslv3 => SslVersion::SSL3,
-                Protocol::Tlsv10 => SslVersion::TLS1,
-                Protocol::Tlsv11 => SslVersion::TLS1_1,
-                Protocol::Tlsv12 => SslVersion::TLS1_2,
-                Protocol::__NonExhaustive => unreachable!(),
-            }
-        }
-
-        ctx.set_min_proto_version(min.map(cvt))?;
-        ctx.set_max_proto_version(max.map(cvt))?;
-
-        Ok(())
-    }
-
-    #[cfg(not(have_min_max_version))]
-    fn supported_protocols(
-        min: Option<Protocol>,
-        max: Option<Protocol>,
-        ctx: &mut SslContextBuilder,
-    ) -> Result<(), ErrorStack> {
-        use openssl::ssl::SslOptions;
-
-        let no_ssl_mask = SslOptions::NO_SSLV2
-            | SslOptions::NO_SSLV3
-            | SslOptions::NO_TLSV1
-            | SslOptions::NO_TLSV1_1
-            | SslOptions::NO_TLSV1_2;
-
-        ctx.clear_options(no_ssl_mask);
-        let mut options = SslOptions::empty();
-        options |= match min {
-            None => SslOptions::empty(),
-            Some(Protocol::Sslv3) => SslOptions::NO_SSLV2,
-            Some(Protocol::Tlsv10) => SslOptions::NO_SSLV2 | SslOptions::NO_SSLV3,
-            Some(Protocol::Tlsv11) => {
-                SslOptions::NO_SSLV2 | SslOptions::NO_SSLV3 | SslOptions::NO_TLSV1
-            }
-            Some(Protocol::Tlsv12) => {
-                SslOptions::NO_SSLV2
-                    | SslOptions::NO_SSLV3
-                    | SslOptions::NO_TLSV1
-                    | SslOptions::NO_TLSV1_1
-            }
-            Some(Protocol::__NonExhaustive) => unreachable!(),
-        };
-        options |= match max {
-            None | Some(Protocol::Tlsv12) => SslOptions::empty(),
-            Some(Protocol::Tlsv11) => SslOptions::NO_TLSV1_2,
-            Some(Protocol::Tlsv10) => SslOptions::NO_TLSV1_1 | SslOptions::NO_TLSV1_2,
-            Some(Protocol::Sslv3) => {
-                SslOptions::NO_TLSV1 | SslOptions::NO_TLSV1_1 | SslOptions::NO_TLSV1_2
-            }
-            Some(Protocol::__NonExhaustive) => unreachable!(),
-        };
-
-        ctx.set_options(options);
-
-        Ok(())
-    }
-
-    #[cfg(target_os = "android")]
     fn load_android_root_certs(connector: &mut SslContextBuilder) -> Result<(), Error> {
-        use std::fs;
-
         if let Ok(dir) = fs::read_dir("/system/etc/security/cacerts") {
             let certs = dir
                 .filter_map(|r| r.ok())
@@ -345,7 +204,7 @@ mod imp {
                 .filter_map(|b| X509::from_pem(&b).ok());
             for cert in certs {
                 if let Err(err) = connector.cert_store_mut().add_cert(cert) {
-                    debug!("load_android_root_certs error: {:?}", err);
+                    log::debug!("load_android_root_certs error: {:?}", err);
                 }
             }
         }
@@ -383,16 +242,6 @@ mod imp {
             Error::Normal(err)
         }
     }
-
-    #[derive(Clone)]
-    pub struct Identity {
-        pkey: PKey<Private>,
-        cert: X509,
-        chain: Vec<X509>,
-    }
-
-    #[derive(Clone)]
-    pub struct Certificate(X509);
 
     pub struct MidHandshakeTlsStream<S>(MidHandshakeSslStream<S>);
 
@@ -432,13 +281,10 @@ mod imp {
     #[derive(Clone)]
     pub struct TlsConnector {
         connector: SslConnector,
-        use_sni: bool,
-        accept_invalid_hostnames: bool,
-        accept_invalid_certs: bool,
     }
 
     impl TlsConnector {
-        pub fn new(builder: &TlsConnectorBuilder) -> Result<TlsConnector, Error> {
+        pub fn new() -> Result<TlsConnector, Error> {
             let mut connector = SslConnector::builder(SslMethod::tls())?;
 
             #[cfg(feature = "openssl-probe")]
@@ -448,33 +294,17 @@ mod imp {
                     .load_verify_locations(probe.cert_file.as_deref(), probe.cert_dir.as_deref())?;
             }
 
-            if let Some(ref identity) = builder.identity {
-                connector.set_certificate(&identity.0.cert)?;
-                connector.set_private_key(&identity.0.pkey)?;
-                for cert in identity.0.chain.iter().rev() {
-                    connector.add_extra_chain_cert(cert.to_owned())?;
-                }
-            }
-            supported_protocols(builder.min_protocol, builder.max_protocol, &mut connector)?;
+            #[cfg(not(have_min_max_version))]
+            connector.set_options(SslOptions::NO_SSLV2 | SslOptions::NO_SSLV3);
+            #[cfg(have_min_max_version)]
+            connector.set_min_proto_version(Some(openssl::ssl::SslVersion::TLS1))?;
 
-            if builder.disable_built_in_roots {
-                connector.set_cert_store(X509StoreBuilder::new()?.build());
+            if cfg!(target_os = "android") {
+                load_android_root_certs(&mut connector)?;
             }
-
-            for cert in &builder.root_certificates {
-                if let Err(err) = connector.cert_store_mut().add_cert((cert.0).0.clone()) {
-                    log::debug!("add_cert error: {:?}", err);
-                }
-            }
-
-            #[cfg(target_os = "android")]
-            load_android_root_certs(&mut connector)?;
 
             Ok(TlsConnector {
                 connector: connector.build(),
-                use_sni: builder.use_sni,
-                accept_invalid_hostnames: builder.accept_invalid_hostnames,
-                accept_invalid_certs: builder.accept_invalid_certs,
             })
         }
 
@@ -482,32 +312,17 @@ mod imp {
         where
             S: io::Read + io::Write,
         {
-            let mut ssl = self
+            let s = self
                 .connector
                 .configure()?
-                .use_server_name_indication(self.use_sni)
-                .verify_hostname(!self.accept_invalid_hostnames);
-            if self.accept_invalid_certs {
-                ssl.set_verify(SslVerifyMode::NONE);
-            }
-
-            let s = ssl.connect(domain, stream)?;
+                .use_server_name_indication(true)
+                .verify_hostname(true)
+                .connect(domain, stream)?;
             Ok(TlsStream(s))
         }
     }
 
-    impl fmt::Debug for TlsConnector {
-        fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-            fmt.debug_struct("TlsConnector")
-                // n.b. SslConnector is a newtype on SslContext which implements a noop Debug so it's omitted
-                .field("use_sni", &self.use_sni)
-                .field("accept_invalid_hostnames", &self.accept_invalid_hostnames)
-                .field("accept_invalid_certs", &self.accept_invalid_certs)
-                .finish()
-        }
-    }
-
-    pub struct TlsStream<S>(ssl::SslStream<S>);
+    pub struct TlsStream<S>(SslStream<S>);
 
     impl<S: fmt::Debug> fmt::Debug for TlsStream<S> {
         fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
