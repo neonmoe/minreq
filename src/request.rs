@@ -439,8 +439,7 @@ impl ParsedRequest {
             let mut url = HttpUrl::parse(url, Some(&self.url)).map_err(|_| {
                 // TODO: Uncomment this for 3.0
                 // Error::InvalidProtocolInRedirect
-                Error::IoError(std::io::Error::new(
-                    std::io::ErrorKind::Other,
+                Error::IoError(std::io::Error::other(
                     "was redirected to an absolute url with an invalid protocol",
                 ))
             })?;
