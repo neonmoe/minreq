@@ -69,16 +69,8 @@ pub struct Identity(imp::Identity);
 pub struct Certificate(imp::Certificate);
 
 /// A TLS stream which has been interrupted midway through the handshake process.
+#[derive(Debug)]
 pub struct MidHandshakeTlsStream<S>(imp::MidHandshakeTlsStream<S>);
-
-impl<S> fmt::Debug for MidHandshakeTlsStream<S>
-where
-    S: fmt::Debug,
-{
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        fmt::Debug::fmt(&self.0, fmt)
-    }
-}
 
 /// An error returned from `ClientBuilder::handshake`.
 #[derive(Debug)]
@@ -132,7 +124,6 @@ impl<S> From<imp::HandshakeError<S>> for HandshakeError<S> {
 
 /// SSL/TLS protocol versions.
 #[derive(Debug, Copy, Clone)]
-#[allow(dead_code, clippy::manual_non_exhaustive)]
 pub enum Protocol {
     /// The SSL 3.0 protocol.
     ///
@@ -496,7 +487,7 @@ mod imp {
 
             for cert in &builder.root_certificates {
                 if let Err(err) = connector.cert_store_mut().add_cert((cert.0).0.clone()) {
-                    debug!("add_cert error: {:?}", err);
+                    log::debug!("add_cert error: {:?}", err);
                 }
             }
 
