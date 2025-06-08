@@ -26,7 +26,6 @@
 //! > FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 //! > DEALINGS IN THE SOFTWARE.
 
-use std::any::Any;
 use std::error;
 use std::fmt;
 use std::io;
@@ -68,13 +67,9 @@ pub struct Identity(imp::Identity);
 #[derive(Clone)]
 pub struct Certificate(imp::Certificate);
 
-/// A TLS stream which has been interrupted midway through the handshake process.
-#[derive(Debug)]
-pub struct MidHandshakeTlsStream<S>(imp::MidHandshakeTlsStream<S>);
-
 /// An error returned from `ClientBuilder::handshake`.
 #[derive(Debug)]
-pub enum HandshakeError<S> {
+pub enum HandshakeError {
     /// A fatal error.
     Failure(Error),
 
@@ -84,40 +79,32 @@ pub enum HandshakeError<S> {
     /// Note that this is not a fatal error and it should be safe to call
     /// `handshake` at a later time once the stream is ready to perform I/O
     /// again.
-    WouldBlock(MidHandshakeTlsStream<S>),
+    WouldBlock,
 }
 
-impl<S> error::Error for HandshakeError<S>
-where
-    S: Any + fmt::Debug,
-{
+impl error::Error for HandshakeError {
     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         match *self {
             HandshakeError::Failure(ref e) => Some(e),
-            HandshakeError::WouldBlock(_) => None,
+            HandshakeError::WouldBlock => None,
         }
     }
 }
 
-impl<S> fmt::Display for HandshakeError<S>
-where
-    S: Any + fmt::Debug,
-{
+impl fmt::Display for HandshakeError {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             HandshakeError::Failure(ref e) => fmt::Display::fmt(e, fmt),
-            HandshakeError::WouldBlock(_) => fmt.write_str("the handshake process was interrupted"),
+            HandshakeError::WouldBlock => fmt.write_str("the handshake process was interrupted"),
         }
     }
 }
 
-impl<S> From<imp::HandshakeError<S>> for HandshakeError<S> {
-    fn from(e: imp::HandshakeError<S>) -> HandshakeError<S> {
+impl From<imp::HandshakeError> for HandshakeError {
+    fn from(e: imp::HandshakeError) -> HandshakeError {
         match e {
             imp::HandshakeError::Failure(e) => HandshakeError::Failure(Error(e)),
-            imp::HandshakeError::WouldBlock(s) => {
-                HandshakeError::WouldBlock(MidHandshakeTlsStream(s))
-            }
+            imp::HandshakeError::WouldBlock => HandshakeError::WouldBlock,
         }
     }
 }
@@ -202,7 +189,7 @@ impl TlsConnector {
         &self,
         domain: &str,
         stream: S,
-    ) -> result::Result<TlsStream<S>, HandshakeError<S>>
+    ) -> result::Result<TlsStream<S>, HandshakeError>
     where
         S: io::Read + io::Write,
     {
@@ -210,10 +197,6 @@ impl TlsConnector {
         Ok(TlsStream(s))
     }
 }
-
-/// A builder for server-side TLS connections.
-#[derive(Clone)]
-pub struct TlsAcceptor(imp::TlsAcceptor);
 
 /// A stream managing a TLS session.
 pub struct TlsStream<S>(imp::TlsStream<S>);
@@ -264,20 +247,15 @@ fn _check_kinds() {
     is_send::<TlsConnectorBuilder>();
     is_sync::<TlsConnector>();
     is_send::<TlsConnector>();
-    is_sync::<TlsAcceptor>();
-    is_send::<TlsAcceptor>();
     is_sync::<TlsStream<TcpStream>>();
     is_send::<TlsStream<TcpStream>>();
-    is_sync::<MidHandshakeTlsStream<TcpStream>>();
-    is_send::<MidHandshakeTlsStream<TcpStream>>();
 }
 
 mod imp {
     use openssl::error::ErrorStack;
     use openssl::pkey::PKey;
     use openssl::ssl::{
-        self, MidHandshakeSslStream, SslAcceptor, SslConnector, SslContextBuilder, SslMethod,
-        SslVerifyMode,
+        self, MidHandshakeSslStream, SslConnector, SslContextBuilder, SslMethod, SslVerifyMode,
     };
     use openssl::x509::{store::X509StoreBuilder, X509VerifyResult, X509};
     use std::error;
@@ -427,28 +405,26 @@ mod imp {
         }
     }
 
-    pub enum HandshakeError<S> {
+    pub enum HandshakeError {
         Failure(Error),
-        WouldBlock(MidHandshakeTlsStream<S>),
+        WouldBlock,
     }
 
-    impl<S> From<ssl::HandshakeError<S>> for HandshakeError<S> {
-        fn from(e: ssl::HandshakeError<S>) -> HandshakeError<S> {
+    impl<S> From<ssl::HandshakeError<S>> for HandshakeError {
+        fn from(e: ssl::HandshakeError<S>) -> HandshakeError {
             match e {
                 ssl::HandshakeError::SetupFailure(e) => HandshakeError::Failure(e.into()),
                 ssl::HandshakeError::Failure(e) => {
                     let v = e.ssl().verify_result();
                     HandshakeError::Failure(Error::Ssl(e.into_error(), v))
                 }
-                ssl::HandshakeError::WouldBlock(s) => {
-                    HandshakeError::WouldBlock(MidHandshakeTlsStream(s))
-                }
+                ssl::HandshakeError::WouldBlock(_) => HandshakeError::WouldBlock,
             }
         }
     }
 
-    impl<S> From<ErrorStack> for HandshakeError<S> {
-        fn from(e: ErrorStack) -> HandshakeError<S> {
+    impl From<ErrorStack> for HandshakeError {
+        fn from(e: ErrorStack) -> HandshakeError {
             HandshakeError::Failure(e.into())
         }
     }
@@ -502,7 +478,7 @@ mod imp {
             })
         }
 
-        pub fn connect<S>(&self, domain: &str, stream: S) -> Result<TlsStream<S>, HandshakeError<S>>
+        pub fn connect<S>(&self, domain: &str, stream: S) -> Result<TlsStream<S>, HandshakeError>
         where
             S: io::Read + io::Write,
         {
@@ -530,9 +506,6 @@ mod imp {
                 .finish()
         }
     }
-
-    #[derive(Clone)]
-    pub struct TlsAcceptor(SslAcceptor);
 
     pub struct TlsStream<S>(ssl::SslStream<S>);
 
