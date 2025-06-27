@@ -226,9 +226,10 @@
 //! variable will be ignored.
 
 #![deny(missing_docs)]
-// std::io::Error::other was added in 1.74, so occurrences of this lint can't be
-// fixed before our MSRV gets that high.
+// Can't fix before an MSRV bump: std::io::Error::other was added in 1.74.
 #![allow(clippy::io_other_error)]
+// Can't fix before an MSRV bump: inlined format args were added after 1.48.0.
+#![allow(clippy::uninlined_format_args)]
 
 #[cfg(feature = "json-using-serde")]
 extern crate serde;

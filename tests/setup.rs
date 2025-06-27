@@ -1,3 +1,6 @@
+// Can't fix before an MSRV bump: inlined format args were added after 1.48.0.
+#![allow(clippy::uninlined_format_args)]
+
 extern crate minreq;
 extern crate tiny_http;
 use self::tiny_http::{Header, Method, Response, Server, StatusCode};

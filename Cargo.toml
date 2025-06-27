@@ -63,7 +63,4 @@ name = "iterator"
 name = "json"
 required-features = ["json-using-serde"]
 
-[lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = ['cfg(have_min_max_version)'] }
-
 # vim: ft=conf
