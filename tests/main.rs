@@ -92,6 +92,21 @@ fn test_redirect_get() {
 }
 
 #[test]
+fn test_redirect_get_without_following() {
+    setup();
+    let res = minreq::get(url("/redirect"))
+        .with_body("Q")
+        .with_follow_redirects(false)
+        .send()
+        .unwrap();
+    assert_eq!(res.status_code, 301);
+    assert_eq!(
+        res.headers.get("location").unwrap(),
+        "http://localhost:35562/a",
+    );
+}
+
+#[test]
 fn test_redirect_post() {
     setup();
     // POSTing to /redirect should return a 303, which means we should

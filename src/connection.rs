@@ -278,7 +278,7 @@ enum NextHop {
 
 fn get_redirect(mut connection: Connection, status_code: i32, url: Option<&String>) -> NextHop {
     match status_code {
-        301 | 302 | 303 | 307 => {
+        301 | 302 | 303 | 307 if connection.request.config.follow_redirects => {
             let url = match url {
                 Some(url) => url,
                 None => return NextHop::Redirect(Err(Error::RedirectLocationMissing)),

@@ -81,6 +81,7 @@ pub struct Request {
     pub(crate) max_headers_size: Option<usize>,
     pub(crate) max_status_line_len: Option<usize>,
     max_redirects: usize,
+    pub(crate) follow_redirects: bool,
     #[cfg(feature = "proxy")]
     pub(crate) proxy: Option<Proxy>,
 }
@@ -108,6 +109,7 @@ impl Request {
             max_headers_size: None,
             max_status_line_len: None,
             max_redirects: 100,
+            follow_redirects: true,
             #[cfg(feature = "proxy")]
             proxy: None,
         }
@@ -201,6 +203,21 @@ impl Request {
     /// becomes a problem, please open an issue.
     pub fn with_max_redirects(mut self, max_redirects: usize) -> Request {
         self.max_redirects = max_redirects;
+        self
+    }
+
+    /// Enables or disables redirect handling. Defaults to `true`, i.e. enabled.
+    ///
+    /// If `follow` is `true` and the server returns a 301, 302, 303, or 307
+    /// status code, minreq will follow the redirect by making another HTTP
+    /// request to the new location, up to the amount of times specified by
+    /// [`Request::with_max_redirects`], returning an error if that amount is
+    /// reached before getting a non-redirection as a response.
+    ///
+    /// Disabling redirection handling with this function by passing in `false`
+    /// can be used to handle the redirects yourself.
+    pub fn with_follow_redirects(mut self, follow_redirects: bool) -> Request {
+        self.follow_redirects = follow_redirects;
         self
     }
 

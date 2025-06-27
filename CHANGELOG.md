@@ -19,6 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   effect, but if it does, it should also only affect the `https-bundled` and
   `https-bundled-probe` features.
 
+### Added
+- `Request::with_follow_redirects` for disabling redirection handling. Thanks
+  for the suggestion, @tachibanayui!
+  ([#120](https://github.com/neonmoe/minreq/issues/120))
+
 ## [2.13.4] - 2025-04-11
 ### Fixed
 - Updated the base64 dependency, only used by the `proxy` feature, to its newest
