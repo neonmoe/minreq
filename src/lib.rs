@@ -100,7 +100,7 @@
 //! creating a request and any subsequently added parameters from
 //! [`Request::with_param`].
 //!
-//! ## `log`
+//! ## `logging`
 //!
 //! This feature enables logging support using the [`log`](https://crates.io/crates/log) crate.
 //!

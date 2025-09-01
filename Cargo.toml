@@ -52,7 +52,7 @@ https-bundled-probe = ["https-bundled", "openssl-probe"]
 https-native = ["native-tls"]
 json-using-serde = ["serde", "serde_json"]
 proxy = ["base64"]
-log = ["dep:log"]
+logging = ["log"]
 
 [[example]]
 name = "hello"

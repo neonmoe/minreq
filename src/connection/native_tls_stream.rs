@@ -13,7 +13,7 @@ pub type SecuredStream = TlsStream<TcpStream>;
 
 pub fn create_secured_stream(conn: &Connection) -> Result<HttpStream, Error> {
     // native-tls setup
-    #[cfg(feature = "log")]
+    #[cfg(feature = "logging")]
     log::trace!("Setting up TLS parameters for {}.", conn.request.url.host);
     let dns_name = &conn.request.url.host;
     let sess = match TlsConnector::new() {
@@ -22,19 +22,19 @@ pub fn create_secured_stream(conn: &Connection) -> Result<HttpStream, Error> {
     };
 
     // Connect
-    #[cfg(feature = "log")]
+    #[cfg(feature = "logging")]
     log::trace!("Establishing TCP connection to {}.", conn.request.url.host);
     let tcp = conn.connect()?;
 
     // Send request
-    #[cfg(feature = "log")]
+    #[cfg(feature = "logging")]
     log::trace!("Establishing TLS session to {}.", conn.request.url.host);
     let mut tls = match sess.connect(dns_name, tcp) {
         Ok(tls) => tls,
         Err(err) => return Err(Error::IoError(io::Error::new(io::ErrorKind::Other, err))),
     };
-    
-    #[cfg(feature = "log")]
+
+    #[cfg(feature = "logging")]
     log::trace!("Writing HTTPS request to {}.", conn.request.url.host);
     let _ = tls.get_ref().set_write_timeout(conn.timeout()?);
     tls.write_all(&conn.request.as_bytes())?;
