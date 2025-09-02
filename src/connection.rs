@@ -126,7 +126,7 @@ impl Connection {
     fn timeout(&self) -> Result<Option<Duration>, io::Error> {
         let timeout = timeout_at_to_duration(self.timeout_at);
 
-        #[cfg(feature = "logging")]
+        #[cfg(feature = "log")]
         log::trace!("Timeout requested, it is currently: {:?}", timeout);
         timeout
     }
@@ -149,7 +149,7 @@ impl Connection {
             ))]
             let secured_stream = openssl_stream::create_secured_stream(&self)?;
 
-            #[cfg(feature = "logging")]
+            #[cfg(feature = "log")]
             log::trace!("Reading HTTPS response from {}.", self.request.url.host);
             let response = ResponseLazy::from_stream(
                 secured_stream,
@@ -168,18 +168,18 @@ impl Connection {
             self.request.url.host = ensure_ascii_host(self.request.url.host)?;
             let bytes = self.request.as_bytes();
 
-            #[cfg(feature = "logging")]
+            #[cfg(feature = "log")]
             log::trace!("Establishing TCP connection to {}.", self.request.url.host);
             let mut tcp = self.connect()?;
 
             // Send request
-            #[cfg(feature = "logging")]
+            #[cfg(feature = "log")]
             log::trace!("Writing HTTP request.");
             let _ = tcp.set_write_timeout(self.timeout()?);
             tcp.write_all(&bytes)?;
 
             // Receive response
-            #[cfg(feature = "logging")]
+            #[cfg(feature = "log")]
             log::trace!("Reading HTTP response.");
             let stream = HttpStream::create_unsecured(tcp, self.timeout_at);
             let response = ResponseLazy::from_stream(
@@ -290,7 +290,7 @@ fn get_redirect(mut connection: Connection, status_code: i32, url: Option<&Strin
                 None => return NextHop::Redirect(Err(Error::RedirectLocationMissing)),
             };
 
-            #[cfg(feature = "logging")]
+            #[cfg(feature = "log")]
             log::debug!("Redirecting ({}) to: {}", status_code, url);
 
             match connection.request.redirect_to(url.as_str()) {
