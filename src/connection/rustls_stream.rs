@@ -47,6 +47,7 @@ static CONFIG: std::sync::LazyLock<Arc<ClientConfig>> = std::sync::LazyLock::new
 
 pub fn create_secured_stream(conn: &Connection) -> Result<HttpStream, Error> {
     // Rustls setup
+    #[cfg(feature = "log")]
     log::trace!("Setting up TLS parameters for {}.", conn.request.url.host);
     let dns_name = match ServerName::try_from(&*conn.request.url.host) {
         Ok(result) => result,
@@ -56,12 +57,15 @@ pub fn create_secured_stream(conn: &Connection) -> Result<HttpStream, Error> {
         ClientConnection::new(CONFIG.clone(), dns_name).map_err(Error::RustlsCreateConnection)?;
 
     // Connect
+    #[cfg(feature = "log")]
     log::trace!("Establishing TCP connection to {}.", conn.request.url.host);
     let tcp = conn.connect()?;
 
     // Send request
+    #[cfg(feature = "log")]
     log::trace!("Establishing TLS session to {}.", conn.request.url.host);
     let mut tls = StreamOwned::new(sess, tcp); // I don't think this actually does any communication.
+    #[cfg(feature = "log")]
     log::trace!("Writing HTTPS request to {}.", conn.request.url.host);
     let _ = tls.get_ref().set_write_timeout(conn.timeout()?);
     tls.write_all(&conn.request.as_bytes())?;
