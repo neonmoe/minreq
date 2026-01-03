@@ -56,6 +56,8 @@ cargo update --package=libc --precise=0.2.163
 cargo update --package=iana-time-zone --precise=0.1.61
 # This again, for some reason.
 cargo update --package=httpdate --precise=1.0.2
+cargo update --package=itoa --precise=1.0.15
+cargo update --package=ryu --precise=1.0.20
 ```
 
 ## License
