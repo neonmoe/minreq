@@ -1,11 +1,16 @@
 //! TLS connection handling functionality when using the `rustls` crate for
 //! handling TLS.
 
-use rustls::{self, ClientConfig, ClientConnection, RootCertStore, ServerName, StreamOwned};
+use rustls::pki_types::ServerName;
+#[cfg(feature = "rustls-webpki")]
+use rustls::RootCertStore;
+use rustls::{self, ClientConfig, ClientConnection, StreamOwned};
+#[cfg(feature = "rustls-platform-verifier")]
+use rustls_platform_verifier::BuilderVerifierExt;
 use std::convert::TryFrom;
 use std::io::{self, Write};
 use std::net::TcpStream;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 #[cfg(feature = "rustls-webpki")]
 use webpki_roots::TLS_SERVER_ROOTS;
 
@@ -15,46 +20,31 @@ use super::{Connection, HttpStream};
 
 pub type SecuredStream = StreamOwned<ClientConnection, TcpStream>;
 
-static CONFIG: std::sync::LazyLock<Arc<ClientConfig>> = std::sync::LazyLock::new(|| {
-    let mut root_certificates = RootCertStore::empty();
-
-    // Try to load native certs
-    #[cfg(feature = "https-rustls-probe")]
-    if let Ok(os_roots) = rustls_native_certs::load_native_certs() {
-        for root_cert in os_roots {
-            // Ignore erroneous OS certificates, there's nothing
-            // to do differently in that situation anyways.
-            let _ = root_certificates.add(&rustls::Certificate(root_cert.0));
-        }
-    }
+static CONFIG: LazyLock<Result<Arc<ClientConfig>, rustls::Error>> = LazyLock::new(|| {
+    let config = ClientConfig::builder();
 
     #[cfg(feature = "rustls-webpki")]
-    #[allow(deprecated)] // Need to use add_server_trust_anchors to compile with rustls 0.21.1
-    root_certificates.add_server_trust_anchors(TLS_SERVER_ROOTS.iter().map(|ta| {
-        rustls::OwnedTrustAnchor::from_subject_spki_name_constraints(
-            ta.subject,
-            ta.spki,
-            ta.name_constraints,
-        )
-    }));
+    let config = config.with_root_certificates(RootCertStore {
+        roots: TLS_SERVER_ROOTS.to_vec(),
+    });
 
-    let config = ClientConfig::builder()
-        .with_safe_defaults()
-        .with_root_certificates(root_certificates)
-        .with_no_client_auth();
-    Arc::new(config)
+    #[cfg(feature = "rustls-platform-verifier")]
+    let config = config.with_platform_verifier()?;
+
+    let config = config.with_no_client_auth();
+    Ok(Arc::new(config))
 });
 
 pub fn create_secured_stream(conn: &Connection) -> Result<HttpStream, Error> {
     // Rustls setup
     #[cfg(feature = "log")]
     log::trace!("Setting up TLS parameters for {}.", conn.request.url.host);
-    let dns_name = match ServerName::try_from(&*conn.request.url.host) {
+    let dns_name = match ServerName::try_from(conn.request.url.host.clone()) {
         Ok(result) => result,
         Err(err) => return Err(Error::IoError(io::Error::new(io::ErrorKind::Other, err))),
     };
-    let sess =
-        ClientConnection::new(CONFIG.clone(), dns_name).map_err(Error::RustlsCreateConnection)?;
+    let config = CONFIG.clone().map_err(Error::RustlsCreateConnection)?;
+    let sess = ClientConnection::new(config, dns_name).map_err(Error::RustlsCreateConnection)?;
 
     // Connect
     #[cfg(feature = "log")]
