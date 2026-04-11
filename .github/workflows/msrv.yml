@@ -2,9 +2,9 @@ name: msrv
 
 on:
   push:
-    branches: [ master ]
+    branches: [ master, v3 ]
   pull_request:
-    branches: [ master ]
+    branches: [ master, v3 ]
   schedule:
     - cron: "47 5 * * 6"
 

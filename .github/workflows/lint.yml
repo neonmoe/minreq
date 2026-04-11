@@ -2,9 +2,9 @@ name: lint
 
 on:
   push:
-    branches: [ master ]
+    branches: [ master, v3 ]
   pull_request:
-    branches: [ master ]
+    branches: [ master, v3 ]
 
 env:
   CARGO_TERM_COLOR: always
