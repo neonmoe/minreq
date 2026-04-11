@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout Crate
-      uses: actions/checkout@v3
+      uses: actions/checkout@v6
     - name: Set Toolchain
       # https://github.com/dtolnay/rust-toolchain
       uses: dtolnay/rust-toolchain@stable

@@ -55,7 +55,7 @@ jobs:
     runs-on: macos-latest
     steps:
     - name: Checkout Crate
-      uses: actions/checkout@v3
+      uses: actions/checkout@v6
     - name: Set Toolchain
       uses: dtolnay/rust-toolchain@stable
     - name: Build
