@@ -106,8 +106,8 @@ impl Request {
             headers: HashMap::new(),
             body: None,
             timeout: None,
-            max_headers_size: None,
-            max_status_line_len: None,
+            max_headers_size: Some(8192),
+            max_status_line_len: Some(8192),
             max_redirects: 100,
             follow_redirects: true,
             #[cfg(feature = "proxy")]
@@ -222,7 +222,7 @@ impl Request {
     }
 
     /// Sets the maximum size of all the headers this request will
-    /// accept.
+    /// accept. The default is 8192.
     ///
     /// If this limit is passed, the request will close the connection
     /// and return an [Error::HeadersOverflow] error.
@@ -233,16 +233,14 @@ impl Request {
     ///
     /// `None` disables the cap, and may cause the program to use any
     /// amount of memory if the server responds with a lot of headers
-    /// (or an infinite amount). In minreq versions 2.x.x, the default
-    /// is None, so setting this manually is recommended when talking
-    /// to untrusted servers.
+    /// (or an infinite amount).
     pub fn with_max_headers_size<S: Into<Option<usize>>>(mut self, max_headers_size: S) -> Request {
         self.max_headers_size = max_headers_size.into();
         self
     }
 
     /// Sets the maximum length of the status line this request will
-    /// accept.
+    /// accept. The default is 8192.
     ///
     /// If this limit is passed, the request will close the connection
     /// and return an [Error::StatusLineOverflow] error.
@@ -252,9 +250,7 @@ impl Request {
     ///
     /// `None` disables the cap, and may cause the program to use any
     /// amount of memory if the server responds with a long (or
-    /// infinite) status line. In minreq versions 2.x.x, the default
-    /// is None, so setting this manually is recommended when talking
-    /// to untrusted servers.
+    /// infinite) status line.
     pub fn with_max_status_line_length<S: Into<Option<usize>>>(
         mut self,
         max_status_line_len: S,
