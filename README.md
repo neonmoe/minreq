@@ -29,7 +29,8 @@ documentation at [docs.rs/minreq](https://docs.rs/minreq).
 
 ## Minimum Supported Rust Version (MSRV)
 
-This project has a stable MSRV policy per major release.
+This project has a stable MSRV policy per major release, so to update this
+policy, we'll need to bump minreq to version 4. Let's hope that never happens.
 
 The current major version (v3) of this library is intended to compile on the
 version of Rust found in Debian oldstable when a particular version of minreq is
@@ -44,12 +45,10 @@ rustls (even without the rustls features enabled for MSRV builds, see
 target, because buildling on an old-ish distro might be useful for e.g. avoiding
 depending on a new version of glibc. Distributing Linux binaries is so fun.
 
-Any optional features might come with their own (higher) MSRVs, this policy only
-applies to minreq without any features enabled. Check the MSRV CI job for
-features that happen to currently work at the MSRV (they will be dropped if they
-stop compiling).
-
-Major version 2 of minreq had an MSRV of 1.48 (except for https features).
+Any optional features might come with their own (more recent) MSRVs, so this
+policy only applies to minreq without any features enabled. Check the [MSRV CI
+job](.github/workflows/msrv.yml) for features that happen to currently work at
+the MSRV (they will be dropped from the MSRV CI if they stop compiling).
 
 ## License
 This crate is distributed under the terms of the [ISC license](COPYING.md).
