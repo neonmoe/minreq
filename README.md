@@ -66,8 +66,6 @@ major version bump.
   length. The ability to add maximums was added in response to
   [#55](https://github.com/neonmoe/minreq/issues/55), but defaults for
   the limits is a breaking change.
-- Change default proxy port to 1080 (from 8080). Curl uses 1080, so it's a sane
-  default.
 
 ### Potential ideas
 

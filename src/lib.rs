@@ -192,7 +192,7 @@
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! #[cfg(feature = "proxy")]
 //! {
-//!     let proxy = minreq::Proxy::new("localhost:8080")?;
+//!     let proxy = minreq::Proxy::new("localhost:1080")?;
 //!     let response = minreq::post("http://example.com")
 //!         .with_proxy(proxy)
 //!         .send()?;

@@ -49,7 +49,7 @@ impl Proxy {
     /// [http://][user[:password]@]host[:port]
     /// ```
     ///
-    /// The default port is 8080, to be changed to 1080 in minreq 3.0.
+    /// The default port is 1080.
     ///
     /// # Example
     ///
@@ -81,7 +81,7 @@ impl Proxy {
             server: host,
             user,
             password,
-            port: port.unwrap_or(8080),
+            port: port.unwrap_or(1080),
             kind: ProxyKind::Basic,
         })
     }
