@@ -5,6 +5,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
+- MSRV from 1.48 to 1.63, and updated the policy to be looser (now tracking
+  Debian oldstable's Rust version instead of settling on a specific version
+  until eternity, and the MSRV no longer applies to any optional features).
+- The `minreq::Error` type to be non-exhaustive, to make adding new errors later
+  possible, and added new variants: `NativeTlsCreateConnection`,
+  `OpenSslCreateConnection`, `InvalidProtocol`, and `InvalidProtocolInRedirect`.
+- The default proxy port to 1080, to match curl.
+- The default maximum sizes for the response status line and headers, both 8KiB.
+- The type of `Response::headers` and `ResponseLazy::headers` from
+  `HashMap<String, String>` to `Vec<(String, String)>`, and removed lowercase
+  normalization of the field names.
+  - To help the usual case, there's two new functions, `Response::header` and
+    `Response::headers`, to get the header value (or all values, if there are
+    multiple of the same header) by field name. In other cases, iterate through
+    and use
+    [`str::eq_ignore_ascii_case`](https://doc.rust-lang.org/std/primitive.str.html#method.eq_ignore_ascii_case)
+    to find your header(s).
+### Added
+- `Response::header` and `Response::headers` for ergonomically sorting through
+  the headers of a response, now that they aren't in a convenient `HashMap`
+  anymore.
 
 ## [2.14.1] - 2025-09-03
 ### Fixed
