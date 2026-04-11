@@ -11,10 +11,10 @@ proxies (`proxy`), and https with various TLS implementations
 `https-bundled-probe`,`https-native`, and `https` which is an alias
 for `https-rustls`).
 
-Without any optional features, my casual testing indicates about 100
+Without any optional features, my casual testing indicates about 148
 KB additional executable size for stripped release builds using this
-crate. Compiled with rustc 1.45.2, `println!("Hello, World!");` is 239
-KB on my machine, where the [hello](examples/hello.rs) example is 347
+crate. Compiled with rustc 1.94.0, `println!("Hello, World!");` is 343
+KB on my machine, where the [hello](examples/hello.rs) example is 491
 KB. Both are pure Rust, so aside from `libc`, everything is statically
 linked.
 
@@ -29,36 +29,27 @@ documentation at [docs.rs/minreq](https://docs.rs/minreq).
 
 ## Minimum Supported Rust Version (MSRV)
 
-If you don't care about the MSRV, you can ignore this section
-entirely, including the commands instructed.
+This project has a stable MSRV policy per major release.
 
-We use an MSRV per major release, i.e., with a new major release we
-reserve the right to change the MSRV.
+The current major version (v3) of this library is intended to compile on the
+version of Rust found in Debian oldstable when a particular version of minreq is
+released. At the time of writing, it is **Rust 1.63** from Debian bookworm.
 
-The current major version (v2) of this library should always compile with any
-combination of features excluding the TLS and urlencoding features on **Rust
-1.48**. This is because those dependencies themselves have a higher MSRV.
+The rationale for this policy is to not need to make a major version bump just
+for an MSRV bump in the future, as having 1.48 set in stone for minreq v2 forced
+a major version bump due to a tough incompatibility issue with a new version of
+rustls (even without the rustls features enabled for MSRV builds, see
+[#123](https://github.com/neonmoe/minreq/issues/123) and
+[#124](https://github.com/neonmoe/minreq/pull/124)). Debian oldstable is the
+target, because buildling on an old-ish distro might be useful for e.g. avoiding
+depending on a new version of glibc. Distributing Linux binaries is so fun.
 
-That said, the crate does still require forcing some dependencies to
-lower-than-latest versions to actually compile with the older
-compiler, as these dependencies have upped their MSRV in a patch
-version. This can be achieved with the following (these just update
-your Cargo.lock):
+Any optional features might come with their own (higher) MSRVs, this policy only
+applies to minreq without any features enabled. Check the MSRV CI job for
+features that happen to currently work at the MSRV (they will be dropped if they
+stop compiling).
 
-```sh
-cargo update --package=log --precise=0.4.18
-cargo update --package=httpdate --precise=1.0.2
-cargo update --package=serde_json --precise=1.0.100
-cargo update --package=chrono --precise=0.4.23
-cargo update --package=num-traits --precise=0.2.18
-cargo update --package=tempfile --precise=3.17.1
-cargo update --package=libc --precise=0.2.163
-cargo update --package=iana-time-zone --precise=0.1.61
-# This again, for some reason.
-cargo update --package=httpdate --precise=1.0.2
-cargo update --package=itoa --precise=1.0.15
-cargo update --package=ryu --precise=1.0.20
-```
+Major version 2 of minreq had an MSRV of 1.48 (except for https features).
 
 ## License
 This crate is distributed under the terms of the [ISC license](COPYING.md).
@@ -79,9 +70,6 @@ major version bump.
   with `http://` or `https://`.
 - Change default proxy port to 1080 (from 8080). Curl uses 1080, so it's a sane
   default.
-- Bump MSRV enough to compile the latest versions of all dependencies, and add
-  the `rust-version` (at least 1.56) and `edition` (at least 2021) fields to
-  Cargo.toml.
 
 ### Potential ideas
 
@@ -89,12 +77,5 @@ Just thinking out loud, might not end up doing some or all of these.
 
 - Non-exhaustive error type, to be able to add new errors in minor
   versions.
-- Refactor applicable parts to `#![no_std]`, maybe even exposing a
-  less convenient API for `#![no_std]` usage. Keep the current API as
-  in any case (at the very least, as a default feature).
-  - Maybe something along the lines of ["The case for
-    sans-io"](https://fasterthanli.me/articles/the-case-for-sans-io)?
-    Adding the much-requested async support as a feature could be
-    pretty clean if built around this idea.
 - Would be good if the crate got smaller with 3.0, not bigger. Maybe
   there's something to cut, something to optimize?

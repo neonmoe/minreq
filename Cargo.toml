@@ -1,6 +1,6 @@
 [package]
 name = "minreq"
-version = "2.14.2-alpha"
+version = "3.0.0-alpha"
 authors = ["Jens Pitkanen <jens@neon.moe>"]
 description = "Simple, minimal-dependency HTTP client"
 documentation = "https://docs.rs/minreq"
@@ -10,7 +10,8 @@ readme = "README.md"
 keywords = ["http", "https", "client", "request", "json"]
 categories = ["web-programming::http-client"]
 license = "ISC"
-edition = "2018"
+edition = "2021"
+rust-version = "1.63"
 
 [badges]
 travis-ci = { repository = "neonmoe/minreq" }
@@ -36,9 +37,14 @@ log = { version = "0.4.0", optional = true }
 openssl-probe = { version = "0.1", optional = true }
 native-tls = { version = "0.2", optional = true }
 
-[dev-dependencies]
-tiny_http = "0.12"
-chrono = "0.4.0"
+[dev-dependencies.tiny_http]
+# tiny_http is used for the integration tests under the `tests` directory.
+git = "https://github.com/tiny-http/tiny-http"
+# `log` is not optional in the latest version of tiny_http, but is at this commit.
+# If a version of tiny_http with that change gets released, prefer that.
+# We don't want `log` as a dependency of our tests, because its latest version's MSRV is 1.68.
+rev = "33b0f26bb9bc7fd17a0ab2a71cf57f08f1ece74b"
+default-features = false
 
 [package.metadata.docs.rs]
 features = ["json-using-serde", "proxy", "https", "punycode"]
@@ -52,6 +58,8 @@ https-bundled-probe = ["https-bundled", "openssl-probe"]
 https-native = ["native-tls"]
 json-using-serde = ["serde", "serde_json"]
 proxy = ["base64"]
+urlencoding = ["dep:urlencoding"]
+punycode = ["dep:punycode"]
 
 [[example]]
 name = "hello"

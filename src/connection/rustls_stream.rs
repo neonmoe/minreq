@@ -15,6 +15,11 @@ use super::{Connection, HttpStream};
 
 pub type SecuredStream = StreamOwned<ClientConnection, TcpStream>;
 
+// This code requires the `rustls` feature to be enabled, so minreq's MSRV
+// policy doesn't apply here. LazyLock was added in 1.80, which should be old
+// enough for rustls users, given that it's old enough for rustls's
+// at-least-9-rust-versions-old MSRV policy.
+#[allow(clippy::incompatible_msrv)]
 static CONFIG: std::sync::LazyLock<Arc<ClientConfig>> = std::sync::LazyLock::new(|| {
     let mut root_certificates = RootCertStore::empty();
 
