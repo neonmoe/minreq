@@ -99,10 +99,7 @@ fn test_redirect_get_without_following() {
         .send()
         .unwrap();
     assert_eq!(res.status_code, 301);
-    assert_eq!(
-        res.headers.get("location").unwrap(),
-        "http://localhost:35562/a",
-    );
+    assert_eq!(res.header("location").unwrap(), "http://localhost:35562/a");
 }
 
 #[test]

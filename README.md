@@ -53,19 +53,3 @@ Major version 2 of minreq had an MSRV of 1.48 (except for https features).
 
 ## License
 This crate is distributed under the terms of the [ISC license](COPYING.md).
-
-## Planned for 3.0.0
-
-This is a list of features I'll implement once it gets long enough, or
-a severe enough issue is found that there's good reason to make a
-major version bump.
-
-- Change the response/request structs to allow multiple headers with
-  the same name.
-
-### Potential ideas
-
-Just thinking out loud, might not end up doing some or all of these.
-
-- Would be good if the crate got smaller with 3.0, not bigger. Maybe
-  there's something to cut, something to optimize?

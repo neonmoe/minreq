@@ -3,7 +3,6 @@ use crate::http_url::{HttpUrl, Port};
 #[cfg(feature = "proxy")]
 use crate::proxy::Proxy;
 use crate::{Error, Response, ResponseLazy};
-use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Write;
 
@@ -75,7 +74,7 @@ pub struct Request {
     pub(crate) method: Method,
     url: URL,
     params: String,
-    headers: HashMap<String, String>,
+    headers: Vec<(String, String)>,
     body: Option<Vec<u8>>,
     pub(crate) timeout: Option<u64>,
     pub(crate) max_headers_size: Option<usize>,
@@ -103,7 +102,7 @@ impl Request {
             method,
             url: url.into(),
             params: String::new(),
-            headers: HashMap::new(),
+            headers: Vec::new(),
             body: None,
             timeout: None,
             max_headers_size: Some(8192),
@@ -123,15 +122,16 @@ impl Request {
         K: Into<String>,
         V: Into<String>,
     {
-        let headers = headers.into_iter().map(|(k, v)| (k.into(), v.into()));
-        self.headers.extend(headers);
+        for (key, value) in headers {
+            self = self.with_header(key, value);
+        }
         self
     }
 
     /// Adds a header to the request this is called on. Use this
     /// function to add headers to your requests.
     pub fn with_header<T: Into<String>, U: Into<String>>(mut self, key: T, value: U) -> Request {
-        self.headers.insert(key.into(), value.into());
+        self.headers.push((key.into(), value.into()));
         self
     }
 
@@ -178,10 +178,10 @@ impl Request {
     /// string.
     #[cfg(feature = "json-using-serde")]
     pub fn with_json<T: serde::ser::Serialize>(mut self, body: &T) -> Result<Request, Error> {
-        self.headers.insert(
+        self.headers.push((
             "Content-Type".to_string(),
             "application/json; charset=UTF-8".to_string(),
-        );
+        ));
         match serde_json::to_string(&body) {
             Ok(json) => Ok(self.with_body(json)),
             Err(err) => Err(Error::SerdeJsonError(err)),
@@ -413,11 +413,11 @@ impl ParsedRequest {
             || self.config.method == Method::Put
             || self.config.method == Method::Patch
         {
-            let not_length = |key: &String| {
+            let not_length = |(key, _): &(String, String)| {
                 !key.eq_ignore_ascii_case("content-length")
                     && !key.eq_ignore_ascii_case("transfer-encoding")
             };
-            if self.config.headers.keys().all(not_length) {
+            if self.config.headers.iter().all(not_length) {
                 // A user agent SHOULD send a Content-Length in a request message when no Transfer-Encoding
                 // is sent and the request method defines a meaning for an enclosed payload body.
                 // refer: https://tools.ietf.org/html/rfc7230#section-3.3.2
@@ -535,15 +535,13 @@ pub fn patch<T: Into<URL>>(url: T) -> Request {
 #[cfg(test)]
 mod parsing_tests {
 
-    use std::collections::HashMap;
-
     use super::{get, ParsedRequest};
 
     #[test]
     fn test_headers() {
-        let mut headers = HashMap::new();
-        headers.insert("foo".to_string(), "bar".to_string());
-        headers.insert("foo".to_string(), "baz".to_string());
+        let mut headers = Vec::new();
+        headers.push(("foo".to_string(), "bar".to_string()));
+        headers.push(("foo".to_string(), "baz".to_string()));
 
         let req = get("http://www.example.org/test/res").with_headers(headers.clone());
 

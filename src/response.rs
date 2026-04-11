@@ -1,5 +1,4 @@
 use crate::{connection::HttpStream, Error};
-use std::collections::HashMap;
 use std::io::{self, BufReader, Bytes, Read};
 use std::str;
 
@@ -24,9 +23,10 @@ pub struct Response {
     pub status_code: i32,
     /// The reason phrase of the response, eg. "Not Found".
     pub reason_phrase: String,
-    /// The headers of the response. The header field names (the
-    /// keys) are all lowercase.
-    pub headers: HashMap<String, String>,
+    /// The headers of the response, as `(field name, value)` tuples. Field
+    /// names are as they were sent by the server (not lowercased, as in minreq
+    /// v2).
+    pub headers: Vec<(String, String)>,
     /// The URL of the resource returned in this response. May differ from the
     /// request URL if it was redirected or typo corrections were applied (e.g.
     /// <http://example.com?foo=bar> would be corrected to
@@ -128,6 +128,47 @@ impl Response {
         self.body
     }
 
+    /// Finds the first value of a header with the given field name, ignoring ASCII
+    /// casing differences.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let url = "http://example.org/";
+    /// let response = minreq::get(url).send()?;
+    /// println!("Content size: {:?}", response.header("Content-Size"));
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn header(&self, field_name: &str) -> Option<&str> {
+        self.headers
+            .iter()
+            .find(|(k, _)| k.eq_ignore_ascii_case(field_name))
+            .map(|(_, v)| v.as_str())
+    }
+
+    /// Finds the values of headers with the given field name, ignoring ASCII
+    /// casing differences.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let url = "http://example.org/";
+    /// let response = minreq::get(url).send()?;
+    /// let server_headers: Vec<&str> = response.headers("Server").collect::<Vec<_>>();
+    /// println!("Server(s) involved in this request: {:?}", server_headers);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn headers<'a>(&'a self, field_name: &'a str) -> impl Iterator<Item = &'a str> {
+        self.headers
+            .iter()
+            .filter(|(k, _)| k.eq_ignore_ascii_case(field_name))
+            .map(|(_, v)| v.as_str())
+    }
+
     /// Converts JSON body to a `struct` using Serde.
     ///
     /// # Errors
@@ -209,9 +250,10 @@ pub struct ResponseLazy {
     pub status_code: i32,
     /// The reason phrase of the response, eg. "Not Found".
     pub reason_phrase: String,
-    /// The headers of the response. The header field names (the
-    /// keys) are all lowercase.
-    pub headers: HashMap<String, String>,
+    /// The headers of the response, as `(field name, value)` tuples. Field
+    /// names are as they were sent by the server (not lowercased, as in minreq
+    /// v2).
+    pub headers: Vec<(String, String)>,
     /// The URL of the resource returned in this response. May differ from the
     /// request URL if it was redirected or typo corrections were applied (e.g.
     /// <http://example.com?foo=bar> would be corrected to
@@ -330,7 +372,7 @@ fn read_with_content_length(
 
 fn read_trailers(
     bytes: &mut HttpStreamBytes,
-    headers: &mut HashMap<String, String>,
+    headers: &mut Vec<(String, String)>,
     mut max_headers_size: Option<usize>,
 ) -> Result<(), Error> {
     loop {
@@ -338,8 +380,8 @@ fn read_trailers(
         if let Some(ref mut max_headers_size) = max_headers_size {
             *max_headers_size -= trailer_line.len() + 2;
         }
-        if let Some((header, value)) = parse_header(trailer_line) {
-            headers.insert(header, value);
+        if let Some(header) = parse_header(trailer_line) {
+            headers.push(header);
         } else {
             break;
         }
@@ -349,7 +391,7 @@ fn read_trailers(
 
 fn read_chunked(
     bytes: &mut HttpStreamBytes,
-    headers: &mut HashMap<String, String>,
+    headers: &mut Vec<(String, String)>,
     expecting_more_chunks: &mut bool,
     chunk_length: &mut usize,
     content_length: &mut usize,
@@ -393,8 +435,8 @@ fn read_chunked(
             }
 
             *expecting_more_chunks = false;
-            headers.insert("content-length".to_string(), (*content_length).to_string());
-            headers.remove("transfer-encoding");
+            headers.retain(|(field_name, _)| !field_name.eq_ignore_ascii_case("transfer-encoding"));
+            headers.push(("content-length".to_string(), (*content_length).to_string()));
             return None;
         }
         *chunk_length = incoming_length;
@@ -447,7 +489,7 @@ enum HttpStreamState {
 struct ResponseMetadata {
     status_code: i32,
     reason_phrase: String,
-    headers: HashMap<String, String>,
+    headers: Vec<(String, String)>,
     state: HttpStreamState,
     max_trailing_headers_size: Option<usize>,
 }
@@ -460,7 +502,7 @@ fn read_metadata(
     let line = read_line(stream, max_status_line_len, Error::StatusLineOverflow)?;
     let (status_code, reason_phrase) = parse_status_line(&line);
 
-    let mut headers = HashMap::new();
+    let mut headers = Vec::new();
     loop {
         let line = read_line(stream, max_headers_size, Error::HeadersOverflow)?;
         if line.is_empty() {
@@ -471,7 +513,7 @@ fn read_metadata(
             *max_headers_size -= line.len() + 2;
         }
         if let Some(header) = parse_header(line) {
-            headers.insert(header.0, header.1);
+            headers.push(header);
         }
     }
 
@@ -479,14 +521,14 @@ fn read_metadata(
     let mut content_length = None;
     for (header, value) in &headers {
         // Handle the Transfer-Encoding header
-        if header.to_lowercase().trim() == "transfer-encoding"
-            && value.to_lowercase().trim() == "chunked"
+        if header.trim().eq_ignore_ascii_case("transfer-encoding")
+            && value.trim().eq_ignore_ascii_case("chunked")
         {
             chunked = true;
         }
 
         // Handle the Content-Length header
-        if header.to_lowercase().trim() == "content-length" {
+        if header.trim().eq_ignore_ascii_case("content-length") {
             match str::parse::<usize>(value.trim()) {
                 Ok(length) => content_length = Some(length),
                 Err(_) => return Err(Error::MalformedContentLength),

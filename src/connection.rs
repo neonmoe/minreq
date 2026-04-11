@@ -251,7 +251,11 @@ fn handle_redirects(
     mut response: ResponseLazy,
 ) -> Result<ResponseLazy, Error> {
     let status_code = response.status_code;
-    let url = response.headers.get("location");
+    let url = response
+        .headers
+        .iter()
+        .find(|(k, _)| k.eq_ignore_ascii_case("location"))
+        .map(|(_, v)| v.as_str());
     match get_redirect(connection, status_code, url) {
         NextHop::Redirect(connection) => {
             let connection = connection?;
@@ -282,7 +286,7 @@ enum NextHop {
     Destination(Connection),
 }
 
-fn get_redirect(mut connection: Connection, status_code: i32, url: Option<&String>) -> NextHop {
+fn get_redirect(mut connection: Connection, status_code: i32, url: Option<&str>) -> NextHop {
     match status_code {
         301 | 302 | 303 | 307 if connection.request.config.follow_redirects => {
             let url = match url {
@@ -293,7 +297,7 @@ fn get_redirect(mut connection: Connection, status_code: i32, url: Option<&Strin
             #[cfg(feature = "log")]
             log::debug!("Redirecting ({}) to: {}", status_code, url);
 
-            match connection.request.redirect_to(url.as_str()) {
+            match connection.request.redirect_to(url) {
                 Ok(()) => {
                     if status_code == 303 {
                         match connection.request.config.method {

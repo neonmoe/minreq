@@ -160,7 +160,7 @@
 //! ```
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let response = minreq::get("http://example.com").send()?;
-//! assert!(response.headers.get("content-type").unwrap().starts_with("text/html"));
+//! assert!(response.header("content-type").unwrap().starts_with("text/html"));
 //! # Ok(()) }
 //! ```
 //!
