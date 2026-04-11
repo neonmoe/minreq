@@ -410,10 +410,6 @@ fn read_chunked(
                     if *chunk_length == 0 {
                         //...read the trailing \r\n of the chunk, and
                         // possibly return an error instead.
-
-                        // TODO: Maybe this could be written in a way
-                        // that doesn't discard the last ok byte if
-                        // the \r\n reading fails?
                         if let Err(err) = read_line(bytes, Some(2), Error::MalformedChunkEnd) {
                             return Some(Err(err));
                         }

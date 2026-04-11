@@ -418,8 +418,8 @@ impl ParsedRequest {
             || self.config.method == Method::Patch
         {
             let not_length = |key: &String| {
-                let key = key.to_lowercase();
-                key != "content-length" && key != "transfer-encoding"
+                !key.eq_ignore_ascii_case("content-length")
+                    && !key.eq_ignore_ascii_case("transfer-encoding")
             };
             if self.config.headers.keys().all(not_length) {
                 // A user agent SHOULD send a Content-Length in a request message when no Transfer-Encoding
@@ -453,14 +453,8 @@ impl ParsedRequest {
     /// limit was reached.
     pub(crate) fn redirect_to(&mut self, url: &str) -> Result<(), Error> {
         if url.contains("://") {
-            let mut url = HttpUrl::parse(url, Some(&self.url)).map_err(|_| {
-                // TODO: Uncomment this for 3.0
-                // Error::InvalidProtocolInRedirect
-                Error::IoError(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    "was redirected to an absolute url with an invalid protocol",
-                ))
-            })?;
+            let mut url = HttpUrl::parse(url, Some(&self.url))
+                .map_err(|_| Error::InvalidProtocolInRedirect)?;
             std::mem::swap(&mut url, &mut self.url);
             self.redirects.push(url);
         } else {

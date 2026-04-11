@@ -7,7 +7,6 @@ use std::io;
 #[test]
 #[cfg(any(feature = "rustls", feature = "https-bundled", feature = "native-tls"))]
 fn test_https() {
-    // TODO: Implement this locally.
     assert_eq!(
         get_status_code(minreq::get("https://example.com").send()),
         200,

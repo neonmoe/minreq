@@ -91,7 +91,7 @@ pub fn create_secured_stream(conn: &Connection) -> Result<HttpStream, Error> {
         .connect(&conn.request.url.host, tcp)
     {
         Ok(tls) => tls,
-        Err(err) => return Err(Error::IoError(io::Error::new(io::ErrorKind::Other, err))),
+        Err(err) => return Err(Error::OpenSslCreateConnection(err)),
     };
 
     #[cfg(feature = "log")]

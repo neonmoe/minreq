@@ -368,9 +368,10 @@ where
                     Ok(()) => thread.join().unwrap(),
                     Err(err) => match err {
                         RecvTimeoutError::Timeout => Err(Error::IoError(timeout_err())),
-                        RecvTimeoutError::Disconnected => {
-                            Err(Error::Other("request connection paniced"))
-                        }
+
+                        // Instead of panicking, `f` should return a result, so
+                        // reaching this branch would be a very bad bug.
+                        RecvTimeoutError::Disconnected => unreachable!(),
                     },
                 }
             } else {

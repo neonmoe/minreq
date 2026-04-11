@@ -31,7 +31,7 @@ pub fn create_secured_stream(conn: &Connection) -> Result<HttpStream, Error> {
     log::trace!("Establishing TLS session to {}.", conn.request.url.host);
     let mut tls = match sess.connect(dns_name, tcp) {
         Ok(tls) => tls,
-        Err(err) => return Err(Error::IoError(io::Error::new(io::ErrorKind::Other, err))),
+        Err(err) => return Err(Error::NativeTlsCreateConnection(err)),
     };
 
     #[cfg(feature = "log")]
