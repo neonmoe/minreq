@@ -539,9 +539,10 @@ mod parsing_tests {
 
     #[test]
     fn test_headers() {
-        let mut headers = Vec::new();
-        headers.push(("foo".to_string(), "bar".to_string()));
-        headers.push(("foo".to_string(), "baz".to_string()));
+        let headers = vec![
+            ("foo".to_string(), "bar".to_string()),
+            ("foo".to_string(), "baz".to_string()),
+        ];
 
         let req = get("http://www.example.org/test/res").with_headers(headers.clone());
 
