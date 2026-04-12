@@ -23,6 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     and use
     [`str::eq_ignore_ascii_case`](https://doc.rust-lang.org/std/primitive.str.html#method.eq_ignore_ascii_case)
     to find your header(s).
+- The query parameter function to take `AsRef<str>` instead of `Into<String>` to
+  avoid unnecessary allocations. Thanks for the PR, @alpha-tango-kilo!
+  ([#69](https://github.com/neonmoe/minreq/pull/69))
 ### Added
 - `Response::header` and `Response::headers` for ergonomically sorting through
   the headers of a response, now that they aren't in a convenient `HashMap`
