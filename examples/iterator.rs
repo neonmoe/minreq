@@ -1,9 +1,9 @@
 //! This example demonstrates probably the most complicated part of
 //! `minreq`. Useful when making loading bars, for example.
-use std::io::Read;
+use std::io::{BufReader, Read};
 
 fn main() -> Result<(), minreq::Error> {
-    for byte in minreq::get("http://example.com").send_lazy()?.bytes() {
+    for byte in BufReader::new(minreq::get("http://example.com").send_lazy()?).bytes() {
         // The connection could have a problem at any point during the
         // download, so each byte needs to be unwrapped.
         let byte = byte?;
