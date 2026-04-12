@@ -2,7 +2,7 @@
 //! handling TLS.
 
 use rustls::pki_types::ServerName;
-#[cfg(feature = "rustls-webpki")]
+#[cfg(all(feature = "rustls-webpki", not(feature = "rustls-platform-verifier")))]
 use rustls::RootCertStore;
 use rustls::{self, ClientConfig, ClientConnection, StreamOwned};
 #[cfg(feature = "rustls-platform-verifier")]
@@ -11,7 +11,7 @@ use std::convert::TryFrom;
 use std::io::{self, Write};
 use std::net::TcpStream;
 use std::sync::{Arc, LazyLock};
-#[cfg(feature = "rustls-webpki")]
+#[cfg(all(feature = "rustls-webpki", not(feature = "rustls-platform-verifier")))]
 use webpki_roots::TLS_SERVER_ROOTS;
 
 use crate::Error;
@@ -28,7 +28,7 @@ pub type SecuredStream = StreamOwned<ClientConnection, TcpStream>;
 static CONFIG: LazyLock<Result<Arc<ClientConfig>, rustls::Error>> = LazyLock::new(|| {
     let config = ClientConfig::builder();
 
-    #[cfg(feature = "rustls-webpki")]
+    #[cfg(all(feature = "rustls-webpki", not(feature = "rustls-platform-verifier")))]
     let config = config.with_root_certificates(RootCertStore {
         roots: TLS_SERVER_ROOTS.to_vec(),
     });
