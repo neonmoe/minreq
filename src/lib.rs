@@ -45,13 +45,13 @@
 //! crate to auto-detect root certificates installed in common
 //! locations.
 //!
-//! ## `https-native`
+//! ## `https-native-tls`
 //!
 //! Like `https`, but uses
-//! [`tls-native`](https://crates.io/crates/native-tls) instead of
+//! [`native-tls`](https://crates.io/crates/native-tls) instead of
 //! `rustls`.
 //!
-//! ## `https-bundled`
+//! ## `https-openssl`
 //!
 //! Like `https`, but uses a statically linked copy of the OpenSSL
 //! library (provided by
@@ -61,9 +61,9 @@
 //! can be specified via the environment variables `SSL_CERT_FILE` or
 //! `SSL_CERT_DIR`.
 //!
-//! ## `https-bundled-probe`
+//! ## `https-openssl-probe`
 //!
-//! Like `https-bundled`, but also includes the
+//! Like `https-openssl`, but also includes the
 //! [`openssl-probe`](https://crates.io/crates/openssl-probe) crate to
 //! auto-detect root certificates installed in common locations.
 //!

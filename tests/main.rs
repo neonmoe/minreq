@@ -5,7 +5,7 @@ use self::setup::*;
 use std::io;
 
 #[test]
-#[cfg(any(feature = "rustls", feature = "https-bundled", feature = "native-tls"))]
+#[cfg(any(feature = "rustls", feature = "https-openssl", feature = "native-tls"))]
 fn test_https() {
     assert_eq!(get_status_code(minreq::get("https://neon.moe").send()), 200,);
 }

@@ -4,12 +4,19 @@
 ![Unit tests](https://github.com/neonmoe/minreq/actions/workflows/unit-tests.yml/badge.svg)
 ![MSRV](https://github.com/neonmoe/minreq/actions/workflows/msrv.yml/badge.svg)
 
-Simple, minimal-dependency HTTP client. Optional features for json
-responses (`json-using-serde`), unicode domains (`punycode`), http
-proxies (`proxy`), and https with various TLS implementations
-(`https-rustls`, `https-rustls-probe`, `https-bundled`,
-`https-bundled-probe`,`https-native`, and `https` which is an alias
-for `https-rustls`).
+Simple, minimal-dependency HTTP client. Optional features for:
+- JSON responses (`json-using-serde`)
+- Unicode domains (`punycode`)
+- HTTP proxies (`proxy`)
+- Percent-encoding for query parameters (`urlencoding`)
+- HTTPS with various TLS implementations:
+  - `https-rustls` (`https` is an alias for this)
+  - `https-rustls-probe`
+  - `https-native-tls`
+  - `https-openssl`
+    - This is based on `native-tls`, just vendoring the openssl part relevant to
+      minreq.
+  - `https-openssl-probe`
 
 Without any optional features, my casual testing indicates about 148
 KB additional executable size for stripped release builds using this
@@ -18,9 +25,8 @@ KB on my machine, where the [hello](examples/hello.rs) example is 491
 KB. Both are pure Rust, so aside from `libc`, everything is statically
 linked.
 
-Note: some of the dependencies of this crate (especially `serde` and
-the various `https` libraries) are a lot more complicated than this
-library, and their impact on executable size reflects that.
+Note: some of the dependencies of this crate are a lot more complicated than
+this library, and their impact on executable size reflects that.
 
 ## Documentation
 

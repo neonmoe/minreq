@@ -29,6 +29,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Response::status_code` and `ResponseLazy::status_code` type from `i32` to
   `u16`. Thanks for the suggestion, @ModProg!
   ([#118](https://github.com/neonmoe/minreq/issues/118))
+- Renamed features `https-bundled` to `https-openssl`, `https-bundled-probe` to
+  `https-openssl-probe`, and `https-native` to `https-native-tls` to make them a
+  little more obvious in what they bring in.
 ### Removed
 - `Iterator` impl for `ResponseLazy`, see the addition section for more on the
   new `Read` impl. Thanks for the PR, @mrkline!

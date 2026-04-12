@@ -26,6 +26,6 @@ jobs:
       run: |
         cargo clippy --all-targets --features "punycode proxy json-using-serde https-rustls" -- --no-deps -D warnings
         cargo clippy --all-targets --features "punycode proxy json-using-serde https-rustls-probe" -- --no-deps -D warnings
-        cargo clippy --all-targets --features "punycode proxy json-using-serde https-bundled" -- --no-deps -D warnings
-        cargo clippy --all-targets --features "punycode proxy json-using-serde https-bundled-probe" -- --no-deps -D warnings
-        cargo clippy --all-targets --features "punycode proxy json-using-serde https-native" -- --no-deps -D warnings
+        cargo clippy --all-targets --features "punycode proxy json-using-serde https-openssl" -- --no-deps -D warnings
+        cargo clippy --all-targets --features "punycode proxy json-using-serde https-openssl-probe" -- --no-deps -D warnings
+        cargo clippy --all-targets --features "punycode proxy json-using-serde https-native-tls" -- --no-deps -D warnings

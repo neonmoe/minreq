@@ -30,9 +30,9 @@ jobs:
         cargo test --features https
         cargo test --features "punycode proxy json-using-serde urlencoding https-rustls"
         cargo test --features "punycode proxy json-using-serde urlencoding https-rustls-probe"
-        cargo test --features "punycode proxy json-using-serde urlencoding https-bundled"
-        cargo test --features "punycode proxy json-using-serde urlencoding https-bundled-probe"
-        cargo test --features "punycode proxy json-using-serde urlencoding https-native"
+        cargo test --features "punycode proxy json-using-serde urlencoding https-openssl"
+        cargo test --features "punycode proxy json-using-serde urlencoding https-openssl-probe"
+        cargo test --features "punycode proxy json-using-serde urlencoding https-native-tls"
   test-windows:
     runs-on: windows-latest
     steps:
