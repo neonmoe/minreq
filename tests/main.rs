@@ -7,10 +7,7 @@ use std::io;
 #[test]
 #[cfg(any(feature = "rustls", feature = "https-bundled", feature = "native-tls"))]
 fn test_https() {
-    assert_eq!(
-        get_status_code(minreq::get("https://example.com").send()),
-        200,
-    );
+    assert_eq!(get_status_code(minreq::get("https://neon.moe").send()), 200,);
 }
 
 #[test]
