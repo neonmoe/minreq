@@ -26,10 +26,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The query parameter function to take `AsRef<str>` instead of `Into<String>` to
   avoid unnecessary allocations. Thanks for the PR, @alpha-tango-kilo!
   ([#69](https://github.com/neonmoe/minreq/pull/69))
+### Removed
+- `Iterator` impl for `ResponseLazy`, see the addition section for more on the
+  new `Read` impl. Thanks for the PR, @mrkline!
+  ([#104](https://github.com/neonmoe/minreq/pull/104))
 ### Added
 - `Response::header` and `Response::headers` for ergonomically sorting through
   the headers of a response, now that they aren't in a convenient `HashMap`
   anymore.
+- `Read` impl for `ResponseLazy`. This improves performance, and the `Read`
+  trait generally matches the functionality better than `Iterator`. Thanks for
+  the PR, @mrkline! ([#104](https://github.com/neonmoe/minreq/pull/104))
 
 ## [2.14.1] - 2025-09-03
 ### Fixed
