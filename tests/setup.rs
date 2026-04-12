@@ -194,12 +194,12 @@ pub fn get_body(request: Result<minreq::Response, minreq::Error>) -> String {
     }
 }
 
-pub fn get_status_code(request: Result<minreq::Response, minreq::Error>) -> i32 {
+pub fn get_status_code(request: Result<minreq::Response, minreq::Error>) -> u16 {
     match request {
         Ok(response) => response.status_code,
         Err(err) => {
             println!("\n[ERROR]: {}\n", err);
-            -1
+            0xFFFF
         }
     }
 }

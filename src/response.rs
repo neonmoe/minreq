@@ -17,7 +17,7 @@ use std::str;
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Response {
     /// The status code of the response, eg. 404.
-    pub status_code: i32,
+    pub status_code: u16,
     /// The reason phrase of the response, eg. "Not Found".
     pub reason_phrase: String,
     /// The headers of the response, as `(field name, value)` tuples. Field
@@ -225,7 +225,7 @@ impl Response {
 /// ```
 pub struct ResponseLazy {
     /// The status code of the response, eg. 404.
-    pub status_code: i32,
+    pub status_code: u16,
     /// The reason phrase of the response, eg. "Not Found".
     pub reason_phrase: String,
     /// The headers of the response, as `(field name, value)` tuples. Field
@@ -420,7 +420,7 @@ enum HttpStreamState {
 // reasons. (Eg. response.status_code is much cleaner than
 // response.meta.status_code or similar.)
 struct ResponseMetadata {
-    status_code: i32,
+    status_code: u16,
     reason_phrase: String,
     headers: Vec<(String, String)>,
     state: HttpStreamState,
@@ -518,7 +518,7 @@ fn read_line(
     String::from_utf8(bytes).map_err(|_error| Error::InvalidUtf8InResponse)
 }
 
-fn parse_status_line(line: &str) -> (i32, String) {
+fn parse_status_line(line: &str) -> (u16, String) {
     // sample status line format
     // HTTP/1.1 200 OK
     let mut status_code = String::with_capacity(3);
@@ -538,7 +538,7 @@ fn parse_status_line(line: &str) -> (i32, String) {
         }
     }
 
-    if let Ok(status_code) = status_code.parse::<i32>() {
+    if let Ok(status_code) = status_code.parse::<u16>() {
         return (status_code, reason_phrase);
     }
 

@@ -286,7 +286,7 @@ enum NextHop {
     Destination(Connection),
 }
 
-fn get_redirect(mut connection: Connection, status_code: i32, url: Option<&str>) -> NextHop {
+fn get_redirect(mut connection: Connection, status_code: u16, url: Option<&str>) -> NextHop {
     match status_code {
         301 | 302 | 303 | 307 if connection.request.config.follow_redirects => {
             let url = match url {
