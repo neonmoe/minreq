@@ -2,11 +2,7 @@
 //! handling TLS.
 
 use rustls::pki_types::ServerName;
-#[cfg(feature = "rustls-webpki")]
-use rustls::RootCertStore;
 use rustls::{self, ClientConfig, ClientConnection, StreamOwned};
-#[cfg(all(feature = "rustls-platform-verifier", not(feature = "rustls-webpki")))]
-use rustls_platform_verifier::BuilderVerifierExt;
 use std::convert::TryFrom;
 use std::io::{self, Write};
 use std::net::TcpStream;
@@ -27,12 +23,15 @@ static CONFIG: LazyLock<Result<Arc<ClientConfig>, rustls::Error>> = LazyLock::ne
     let config = ClientConfig::builder();
 
     #[cfg(feature = "rustls-webpki")]
-    let config = config.with_root_certificates(RootCertStore {
+    let config = config.with_root_certificates(rustls::RootCertStore {
         roots: webpki_roots::TLS_SERVER_ROOTS.to_vec(),
     });
 
     #[cfg(all(feature = "rustls-platform-verifier", not(feature = "rustls-webpki")))]
-    let config = config.with_platform_verifier()?;
+    let config = {
+        use rustls_platform_verifier::BuilderVerifierExt;
+        config.with_platform_verifier()?
+    };
 
     let config = config.with_no_client_auth();
     Ok(Arc::new(config))
