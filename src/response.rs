@@ -200,6 +200,11 @@ impl Response {
             Err(err) => Err(Error::SerdeJsonError(err)),
         }
     }
+
+    /// Returns `true` when the response status is in the 200–299 range.
+    pub fn is_success(&self) -> bool {
+        (200..300).contains(&self.status_code)
+    }
 }
 
 /// An HTTP response, which streams bytes as they arrive on the
@@ -267,6 +272,11 @@ impl ResponseLazy {
             state,
             max_trailing_headers_size,
         })
+    }
+
+    /// Returns `true` when the response status is in the 200–299 range.
+    pub fn is_success(&self) -> bool {
+        (200..300).contains(&self.status_code)
     }
 }
 
