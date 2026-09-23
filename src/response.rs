@@ -238,9 +238,7 @@ pub struct ResponseLazy {
     /// <http://example.com/?foo=bar>).
     pub url: String,
 
-    stream: BufReader<HttpStream>,
-    state: HttpStreamState,
-    max_trailing_headers_size: Option<usize>,
+    decoder: BodyDecoder,
 }
 
 impl ResponseLazy {
@@ -258,32 +256,56 @@ impl ResponseLazy {
             max_trailing_headers_size,
         } = read_metadata(&mut stream, max_headers_size, max_status_line_len)?;
 
+        let raw = RawBody {
+            stream,
+            state,
+            max_trailing_headers_size,
+            trailers: Vec::new(),
+        };
+
+        let decoder = select_decoder(&headers, raw)?;
+
         Ok(ResponseLazy {
             status_code,
             reason_phrase,
             headers,
             url: String::new(),
-            stream,
-            state,
-            max_trailing_headers_size,
+            decoder,
         })
     }
 }
 
 impl Read for ResponseLazy {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        let bytes_read = self.decoder.read(buf)?;
+        self.headers
+            .extend(self.decoder.raw_body_mut().take_trailers());
+        Ok(bytes_read)
+    }
+}
+
+struct RawBody {
+    stream: BufReader<HttpStream>,
+    state: HttpStreamState,
+    max_trailing_headers_size: Option<usize>,
+    trailers: Vec<(String, String)>,
+}
+
+impl RawBody {
+    fn take_trailers(&mut self) -> Vec<(String, String)> {
+        std::mem::take(&mut self.trailers)
+    }
+}
+
+impl Read for RawBody {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         use HttpStreamState::*;
         match &mut self.state {
-            // If we're reading until the TCP stream closes,
-            // just... read it!
             EndOnClose => self.stream.read(buf),
-            // If we have a content length, read up to the remaining number
-            // of bytes, or the buffer size, whichever is smaller.
             ContentLength { to_go } => {
                 if *to_go == 0 {
                     return Ok(0);
                 }
-
                 let to_read = buf.len().min(*to_go);
                 let n = self.stream.read(&mut buf[..to_read])?;
                 *to_go -= n;
@@ -292,12 +314,82 @@ impl Read for ResponseLazy {
             Chunked { more_chunks, to_go } => read_chunked(
                 buf,
                 &mut self.stream,
-                &mut self.headers,
+                &mut self.trailers,
                 self.max_trailing_headers_size,
                 more_chunks,
                 to_go,
             ),
         }
+    }
+}
+
+enum BodyDecoder {
+    Identity(RawBody),
+    #[cfg(feature = "gzip")]
+    Gzip(flate2::read::MultiGzDecoder<RawBody>),
+    #[cfg(feature = "deflate")]
+    Deflate(flate2::read::DeflateDecoder<RawBody>),
+    #[cfg(feature = "brotli")]
+    Brotli(Box<brotli::Decompressor<RawBody>>),
+    #[cfg(feature = "zstd")]
+    Zstd(Box<zstd::stream::Decoder<'static, BufReader<RawBody>>>),
+}
+
+impl Read for BodyDecoder {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        match self {
+            BodyDecoder::Identity(reader) => reader.read(buf),
+            #[cfg(feature = "gzip")]
+            BodyDecoder::Gzip(reader) => reader.read(buf),
+            #[cfg(feature = "deflate")]
+            BodyDecoder::Deflate(reader) => reader.read(buf),
+            #[cfg(feature = "brotli")]
+            BodyDecoder::Brotli(reader) => reader.read(buf),
+            #[cfg(feature = "zstd")]
+            BodyDecoder::Zstd(reader) => reader.read(buf),
+        }
+    }
+}
+
+impl BodyDecoder {
+    fn raw_body_mut(&mut self) -> &mut RawBody {
+        match self {
+            BodyDecoder::Identity(reader) => reader,
+            #[cfg(feature = "gzip")]
+            BodyDecoder::Gzip(reader) => reader.get_mut(),
+            #[cfg(feature = "deflate")]
+            BodyDecoder::Deflate(reader) => reader.get_mut(),
+            #[cfg(feature = "brotli")]
+            BodyDecoder::Brotli(reader) => reader.get_mut(),
+            #[cfg(feature = "zstd")]
+            BodyDecoder::Zstd(reader) => reader.get_mut().get_mut(),
+        }
+    }
+}
+fn select_decoder(headers: &[(String, String)], raw: RawBody) -> Result<BodyDecoder, Error> {
+    let encoding = headers
+        .iter()
+        .find(|(key, _)| key.eq_ignore_ascii_case("content-encoding"))
+        .map(|(_, value)| value.trim());
+
+    match encoding {
+        #[cfg(feature = "gzip")]
+        Some(encoding) if encoding.eq_ignore_ascii_case("gzip") => {
+            Ok(BodyDecoder::Gzip(flate2::read::MultiGzDecoder::new(raw)))
+        }
+        #[cfg(feature = "deflate")]
+        Some(encoding) if encoding.eq_ignore_ascii_case("deflate") => {
+            Ok(BodyDecoder::Deflate(flate2::read::DeflateDecoder::new(raw)))
+        }
+        #[cfg(feature = "brotli")]
+        Some(encoding) if encoding.eq_ignore_ascii_case("br") => Ok(BodyDecoder::Brotli(Box::new(
+            brotli::Decompressor::new(raw, 4096),
+        ))),
+        #[cfg(feature = "zstd")]
+        Some(encoding) if encoding.eq_ignore_ascii_case("zstd") => Ok(BodyDecoder::Zstd(Box::new(
+            zstd::stream::Decoder::new(raw).map_err(Error::IoError)?,
+        ))),
+        _ => Ok(BodyDecoder::Identity(raw)),
     }
 }
 
@@ -327,13 +419,13 @@ fn read_chunked(
     max_trailing_headers_size: Option<usize>,
     more_chunks: &mut bool,
     to_go: &mut usize, // In the current chunk
-) -> std::io::Result<usize> {
+) -> io::Result<usize> {
     if !*more_chunks && *to_go == 0 {
         return Ok(0);
     }
 
     // Save some typing:
-    fn bail<E: Into<Box<dyn std::error::Error + Send + Sync>>>(e: E) -> std::io::Result<usize> {
+    fn bail<E: Into<Box<dyn std::error::Error + Send + Sync>>>(e: E) -> io::Result<usize> {
         Err(io::Error::new(io::ErrorKind::Other, e))
     }
 
