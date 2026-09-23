@@ -328,7 +328,7 @@ enum BodyDecoder {
     #[cfg(feature = "gzip")]
     Gzip(flate2::read::MultiGzDecoder<RawBody>),
     #[cfg(feature = "deflate")]
-    Deflate(flate2::read::DeflateDecoder<RawBody>),
+    Deflate(flate2::read::ZlibDecoder<RawBody>),
     #[cfg(feature = "brotli")]
     Brotli(Box<brotli::Decompressor<RawBody>>),
     #[cfg(feature = "zstd")]
@@ -379,7 +379,7 @@ fn select_decoder(headers: &[(String, String)], raw: RawBody) -> Result<BodyDeco
         }
         #[cfg(feature = "deflate")]
         Some(encoding) if encoding.eq_ignore_ascii_case("deflate") => {
-            Ok(BodyDecoder::Deflate(flate2::read::DeflateDecoder::new(raw)))
+            Ok(BodyDecoder::Deflate(flate2::read::ZlibDecoder::new(raw)))
         }
         #[cfg(feature = "brotli")]
         Some(encoding) if encoding.eq_ignore_ascii_case("br") => Ok(BodyDecoder::Brotli(Box::new(

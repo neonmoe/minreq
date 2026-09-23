@@ -45,7 +45,7 @@ fn encoded_response(encoding: &str) -> Response<Cursor<Vec<u8>>> {
         #[cfg(feature = "deflate")]
         "deflate" => {
             let mut encoder =
-                flate2::write::DeflateEncoder::new(Vec::new(), flate2::Compression::default());
+                flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::default());
             encoder.write_all(ENCODED_BODY.as_bytes()).unwrap();
             encoder.finish().unwrap()
         }
