@@ -4,6 +4,64 @@ mod setup;
 use self::setup::*;
 use std::io;
 
+#[cfg(any(
+    feature = "gzip",
+    feature = "deflate",
+    feature = "brotli",
+    feature = "zstd"
+))]
+fn assert_content_decoding(encoding: &str) {
+    use std::io::Read;
+
+    setup();
+    let request_url = url("/encoded");
+
+    let response = minreq::get(&request_url)
+        .with_header("Accept-Encoding", encoding)
+        .send()
+        .unwrap();
+    assert_eq!(response.as_bytes(), ENCODED_BODY.as_bytes());
+
+    let mut response = minreq::get(request_url)
+        .with_header("Accept-Encoding", encoding)
+        .send_lazy()
+        .unwrap();
+    let mut decoded = Vec::new();
+    let mut buffer = [0; 7];
+    loop {
+        let bytes_read = response.read(&mut buffer).unwrap();
+        if bytes_read == 0 {
+            break;
+        }
+        decoded.extend_from_slice(&buffer[..bytes_read]);
+    }
+    assert_eq!(decoded, ENCODED_BODY.as_bytes());
+}
+
+#[test]
+#[cfg(feature = "gzip")]
+fn test_gzip_content_decoding() {
+    assert_content_decoding("gzip");
+}
+
+#[test]
+#[cfg(feature = "deflate")]
+fn test_deflate_content_decoding() {
+    assert_content_decoding("deflate");
+}
+
+#[test]
+#[cfg(feature = "brotli")]
+fn test_brotli_content_decoding() {
+    assert_content_decoding("br");
+}
+
+#[test]
+#[cfg(feature = "zstd")]
+fn test_zstd_content_decoding() {
+    assert_content_decoding("zstd");
+}
+
 #[test]
 #[cfg(any(feature = "rustls", feature = "https-openssl", feature = "native-tls"))]
 fn test_https() {

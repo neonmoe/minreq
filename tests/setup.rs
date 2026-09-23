@@ -9,7 +9,64 @@ use std::sync::{Arc, Once};
 use std::thread;
 use std::time::Duration;
 
+#[cfg(any(
+    feature = "gzip",
+    feature = "deflate",
+    feature = "brotli",
+    feature = "zstd"
+))]
+use std::io::{Cursor, Write};
+
 static INIT: Once = Once::new();
+
+#[cfg(any(
+    feature = "gzip",
+    feature = "deflate",
+    feature = "brotli",
+    feature = "zstd"
+))]
+pub const ENCODED_BODY: &str = "response body decoded while streaming";
+
+#[cfg(any(
+    feature = "gzip",
+    feature = "deflate",
+    feature = "brotli",
+    feature = "zstd"
+))]
+fn encoded_response(encoding: &str) -> Response<Cursor<Vec<u8>>> {
+    let encoded = match encoding {
+        #[cfg(feature = "gzip")]
+        "gzip" => {
+            let mut encoder =
+                flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
+            encoder.write_all(ENCODED_BODY.as_bytes()).unwrap();
+            encoder.finish().unwrap()
+        }
+        #[cfg(feature = "deflate")]
+        "deflate" => {
+            let mut encoder =
+                flate2::write::DeflateEncoder::new(Vec::new(), flate2::Compression::default());
+            encoder.write_all(ENCODED_BODY.as_bytes()).unwrap();
+            encoder.finish().unwrap()
+        }
+        #[cfg(feature = "brotli")]
+        "br" => {
+            let mut encoded = Vec::new();
+            {
+                let mut encoder = brotli::CompressorWriter::new(&mut encoded, 4096, 5, 22);
+                encoder.write_all(ENCODED_BODY.as_bytes()).unwrap();
+            }
+            encoded
+        }
+        #[cfg(feature = "zstd")]
+        "zstd" => zstd::stream::encode_all(ENCODED_BODY.as_bytes(), 0).unwrap(),
+        _ => unreachable!("test requested a disabled content encoding"),
+    };
+
+    Response::from_data(encoded).with_header(
+        Header::from_bytes("Content-Encoding".as_bytes(), encoding.as_bytes()).unwrap(),
+    )
+}
 
 pub fn setup() {
     INIT.call_once(|| {
@@ -51,6 +108,20 @@ pub fn setup() {
                     Method::Get if url == "/a" => {
                         let response = Response::from_string(format!("j: {}", content));
                         request.respond(response).ok();
+                    }
+                    #[cfg(any(
+                        feature = "gzip",
+                        feature = "deflate",
+                        feature = "brotli",
+                        feature = "zstd"
+                    ))]
+                    Method::Get if url == "/encoded" => {
+                        let encoding = headers
+                            .iter()
+                            .find(|header| header.field.as_str() == "Accept-Encoding")
+                            .map(|header| header.value.to_string())
+                            .expect("encoded test request is missing Accept-Encoding");
+                        request.respond(encoded_response(&encoding)).ok();
                     }
                     Method::Post if url == "/a" => {
                         let response = Response::from_string("POST to /a is not valid.");
