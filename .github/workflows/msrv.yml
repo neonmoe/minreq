@@ -18,7 +18,7 @@ jobs:
       - name: Checkout Crate
         uses: actions/checkout@v6
       - name: Checkout Toolchain
-        uses: dtolnay/rust-toolchain@1.85
+        uses: dtolnay/rust-toolchain@1.63
       - name: Running test script
         run: |
           cargo test

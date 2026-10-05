@@ -218,6 +218,10 @@
 //!   ```text,ignore
 //!   $ MINREQ_TIMEOUT=8 ./foo
 //!   ```
+//!   Or add the following somewhere before the requests in the code.
+//!   ```
+//!   std::env::set_var("MINREQ_TIMEOUT", "8");
+//!   ```
 //! If the timeout is set with `with_timeout`, the environment
 //! variable will be ignored.
 

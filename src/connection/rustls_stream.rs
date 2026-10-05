@@ -43,7 +43,7 @@ pub fn create_secured_stream(conn: &Connection) -> Result<HttpStream, Error> {
     log::trace!("Setting up TLS parameters for {}.", conn.request.url.host);
     let dns_name = match ServerName::try_from(conn.request.url.host.clone()) {
         Ok(result) => result,
-        Err(err) => return Err(Error::IoError(io::Error::other(err))),
+        Err(err) => return Err(Error::IoError(io::Error::new(io::ErrorKind::Other, err))),
     };
     let config = CONFIG.clone().map_err(Error::RustlsCreateConnection)?;
     let sess = ClientConnection::new(config, dns_name).map_err(Error::RustlsCreateConnection)?;

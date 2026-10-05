@@ -40,7 +40,7 @@ pub type SecuredStream = SslStream<TcpStream>;
 
 impl From<ErrorStack> for Error {
     fn from(err: ErrorStack) -> Self {
-        Error::IoError(io::Error::other(err))
+        Error::IoError(io::Error::new(io::ErrorKind::Other, err))
     }
 }
 
@@ -55,12 +55,8 @@ pub fn create_secured_stream(conn: &Connection) -> Result<HttpStream, Error> {
         #[cfg(feature = "openssl-probe")]
         {
             let probe = openssl_probe::probe();
-            if let Some(cert_file) = probe.cert_file {
-                connector_builder.set_ca_file(cert_file)?;
-            }
-            for cert_dir in probe.cert_dir {
-                connector_builder.load_verify_locations(None, Some(&cert_dir))?;
-            }
+            connector_builder
+                .load_verify_locations(probe.cert_file.as_deref(), probe.cert_dir.as_deref())?;
         }
 
         if cfg!(target_os = "android") {

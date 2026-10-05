@@ -18,7 +18,7 @@ pub fn create_secured_stream(conn: &Connection) -> Result<HttpStream, Error> {
     let dns_name = &conn.request.url.host;
     let sess = match TlsConnector::new() {
         Ok(sess) => sess,
-        Err(err) => return Err(Error::IoError(io::Error::other(err))),
+        Err(err) => return Err(Error::IoError(io::Error::new(io::ErrorKind::Other, err))),
     };
 
     // Connect

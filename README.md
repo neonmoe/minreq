@@ -36,20 +36,20 @@ documentation at [docs.rs/minreq](https://docs.rs/minreq).
 ## Minimum Supported Rust Version (MSRV)
 
 This project has a stable MSRV policy per major release, so to update this
-policy, we'll need to bump minreq to a new major version.
+policy, we'll need to bump minreq to version 4. Let's hope that never happens.
 
-The current major version (v4) requires **Rust 1.85**, as shipped by Debian
-trixie.
+The current major version (v3) of this library is intended to compile on the
+version of Rust found in Debian oldstable when a particular version of minreq is
+released. At the time of writing, it is **Rust 1.63** from Debian bookworm.
 
 The rationale for this policy is to not need to make a major version bump just
 for an MSRV bump in the future, as having 1.48 set in stone for minreq v2 forced
 a major version bump due to a tough incompatibility issue with a new version of
 rustls (even without the rustls features enabled for MSRV builds, see
 [#123](https://github.com/neonmoe/minreq/issues/123) and
-[#124](https://github.com/neonmoe/minreq/pull/124)). A Debian release toolchain
-is the target because building on an old-ish distro might be useful for e.g.
-avoiding depending on a new version of glibc. Distributing Linux binaries is so
-fun.
+[#124](https://github.com/neonmoe/minreq/pull/124)). Debian oldstable is the
+target, because buildling on an old-ish distro might be useful for e.g. avoiding
+depending on a new version of glibc. Distributing Linux binaries is so fun.
 
 Any optional features might come with their own (more recent) MSRVs, so this
 policy only applies to minreq without any features enabled. Check the [MSRV CI

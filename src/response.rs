@@ -426,7 +426,7 @@ fn read_chunked(
 
     // Save some typing:
     fn bail<E: Into<Box<dyn std::error::Error + Send + Sync>>>(e: E) -> io::Result<usize> {
-        Err(io::Error::other(e))
+        Err(io::Error::new(io::ErrorKind::Other, e))
     }
 
     // If we have no bytes left to read in the current chunk,
