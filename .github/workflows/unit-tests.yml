@@ -27,6 +27,7 @@ jobs:
         cargo test --features proxy
         cargo test --features json-using-serde
         cargo test --features urlencoding
+        cargo test --features "gzip deflate brotli zstd"
         cargo test --features https
         cargo test --features "punycode proxy json-using-serde urlencoding https-rustls"
         cargo test --features "punycode proxy json-using-serde urlencoding https-rustls-probe"
