@@ -65,7 +65,11 @@ fn test_zstd_content_decoding() {
 #[test]
 #[cfg(any(feature = "rustls", feature = "https-openssl", feature = "native-tls"))]
 fn test_https() {
-    assert_eq!(get_status_code(minreq::get("https://neon.moe").send()), 200,);
+    let response = minreq::get("https://example.com")
+        .with_timeout(15)
+        .send()
+        .expect("HTTPS request failed");
+    assert_eq!(response.status_code, 200);
 }
 
 #[test]
