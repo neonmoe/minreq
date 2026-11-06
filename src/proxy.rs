@@ -17,7 +17,7 @@ pub(crate) enum ProxyKind {
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Proxy {
     pub(crate) server: String,
-    pub(crate) port: u32,
+    pub(crate) port: u16,
     pub(crate) user: Option<String>,
     pub(crate) password: Option<String>,
     pub(crate) kind: ProxyKind,
@@ -32,9 +32,12 @@ impl Proxy {
         }
     }
 
-    fn parse_address(host: &str) -> Result<(String, Option<u32>), Error> {
+    fn parse_address(host: &str) -> Result<(String, Option<u16>), Error> {
         if let Some((host, port)) = split_once(host, ":") {
-            let port = port.parse::<u32>().map_err(|_| Error::BadProxy)?;
+            if !port.bytes().all(|byte| byte.is_ascii_digit()) {
+                return Err(Error::BadProxy);
+            }
+            let port = port.parse::<u16>().map_err(|_| Error::BadProxy)?;
             Ok((host.to_string(), Some(port)))
         } else {
             Ok((host.to_string(), None))
@@ -143,6 +146,14 @@ fn rsplit_once<'a>(string: &'a str, pattern: &str) -> Option<(&'a str, &'a str)>
 #[cfg(test)]
 mod tests {
     use super::Proxy;
+
+    #[test]
+    fn proxy_port_boundaries() {
+        assert_eq!(Proxy::new("example.test:65535").unwrap().port, 65535);
+        for port in ["65536", "4294967295", "4294967296", "-1", "+80", "abc"] {
+            assert!(Proxy::new(format!("example.test:{port}")).is_err());
+        }
+    }
 
     #[test]
     fn parse_proxy() {
