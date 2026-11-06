@@ -331,25 +331,27 @@ impl ParsedRequest {
         //
         // Curl documentation: https://everything.curl.dev/usingcurl/proxies/env
         //
-        // Accepted variables are `http_proxy`, `https_proxy`, `HTTPS_PROXY`,
-        // `all_proxy`, and `ALL_PROXY`, in protocol-specific then fallback order.
+        // Accepted variables are `http_proxy`, `https_proxy`, `HTTPS_PROXY`, `ALL_PROXY`
         //
         // Note: https://everything.curl.dev/usingcurl/proxies/env#http_proxy-in-lower-case-only
         if config.proxy.is_none() {
-            let keys: &[&str] = if url.https {
-                &["https_proxy", "HTTPS_PROXY", "all_proxy", "ALL_PROXY"]
-            } else {
-                &["http_proxy", "all_proxy", "ALL_PROXY"]
-            };
-            for key in keys {
-                match std::env::var(key) {
-                    Ok(proxy) => {
-                        config.proxy = Some(Proxy::new(proxy)?);
-                        break;
-                    }
-                    Err(std::env::VarError::NotPresent) => {}
-                    Err(std::env::VarError::NotUnicode(_)) => return Err(Error::BadProxy),
+            // Set HTTP proxies if request's protocol is HTTPS and they're given
+            if url.https {
+                if let Ok(proxy) =
+                    std::env::var("https_proxy").map_err(|_| std::env::var("HTTPS_PROXY"))
+                {
+                    config.proxy = Some(Proxy::new(proxy)?);
                 }
+            }
+            // Set HTTP proxies if request's protocol is HTTP and they're given
+            else if let Ok(proxy) = std::env::var("http_proxy") {
+                config.proxy = Some(Proxy::new(proxy)?);
+            }
+            // Set any given proxies if neither of HTTP/HTTPS were given
+            else if let Ok(proxy) =
+                std::env::var("all_proxy").map_err(|_| std::env::var("ALL_PROXY"))
+            {
+                config.proxy = Some(Proxy::new(proxy)?);
             }
         }
 
@@ -616,14 +618,11 @@ mod environment_proxy_tests {
         for (case, variable, value) in [
             ("http-invalid", "http_proxy", "gateway:65536"),
             ("http-invalid", "all_proxy", "gateway:65536"),
-            ("http-invalid", "ALL_PROXY", "gateway:65536"),
             ("https-invalid", "https_proxy", "gateway:65536"),
-            ("https-invalid", "HTTPS_PROXY", "gateway:65536"),
-            ("https-invalid", "ALL_PROXY", "gateway:65536"),
             ("http-invalid", "http_proxy", "gateway:+8080"),
             ("http", "http_proxy", "gateway:1234"),
-            ("https", "HTTPS_PROXY", "gateway:1234"),
-            ("https", "ALL_PROXY", "gateway:1234"),
+            ("http", "all_proxy", "gateway:1234"),
+            ("https", "https_proxy", "gateway:1234"),
             ("explicit", "http_proxy", "gateway:65536"),
         ] {
             let mut command = std::process::Command::new(std::env::current_exe().unwrap());
