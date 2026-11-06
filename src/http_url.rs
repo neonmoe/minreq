@@ -73,10 +73,18 @@ impl HttpUrl {
                             resource.push(c);
                         }
                         ':' => status = UrlParseStatus::Port,
+                        '#' => {
+                            status = UrlParseStatus::Fragment;
+                            path_and_query = Some(String::new());
+                        }
                         _ => host.push(c),
                     }
                 }
                 UrlParseStatus::Port => match c {
+                    '#' => {
+                        status = UrlParseStatus::Fragment;
+                        path_and_query = Some(String::new());
+                    }
                     '/' | '?' => {
                         status = UrlParseStatus::PathAndQuery;
                         resource.push(c);
@@ -231,6 +239,22 @@ mod port_tests {
         ] {
             assert_eq!(HttpUrl::parse(url, None).unwrap().port.port(), expected);
         }
+    }
+
+    #[test]
+    fn authority_fragments_preserve_valid_ports() {
+        for (url, port) in [
+            ("http://example.test#section", 80),
+            ("http://example.test:80#section", 80),
+            ("https://example.test:65535#section", 65535),
+            ("https://example.test:#section", 443),
+        ] {
+            let parsed = HttpUrl::parse(url, None).unwrap();
+            assert_eq!(parsed.port.port(), port);
+            assert_eq!(parsed.path_and_query, "/");
+            assert_eq!(parsed.fragment.as_deref(), Some("section"));
+        }
+        assert!(HttpUrl::parse("http://example.test:65536#section", None).is_err());
     }
 
     #[test]
